@@ -33,7 +33,7 @@ class ProfileService {
       'phone': profile['phone'],
       'role': profile['role'],
       'premise_code': profile['premise_code'],
-      
+      'profile_image_url': profile['profile_image_url'],
       'premise': premise?['premise'],
       'premise_type': premise?['premise_type'],
       'address': premise?['address'],

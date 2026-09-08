@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'screens/welcome_screen.dart';
+import 'services/local_database_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  
   await Supabase.initialize(
     url: 'https://afggmxyqarbgqedzoxkh.supabase.co',
     anonKey: 'sb_publishable_lmO5FpN7j9Jfz5oANPWRXg_3auGDfMR',
   );
+
+  await LocalDatabaseService.instance.database;
 
   runApp(const MyApp());
 }
@@ -112,67 +116,6 @@ class MyApp extends StatelessWidget {
       ),
 
       home: const WelcomeScreen(),
-    );
-  }
-}
-
-class SupabaseTestPage extends StatefulWidget {
-  const SupabaseTestPage({super.key});
-
-  @override
-  State<SupabaseTestPage> createState() => _SupabaseTestPageState();
-}
-
-class _SupabaseTestPageState extends State<SupabaseTestPage> {
-  String status = 'Connecting to Supabase...';
-
-  @override
-  void initState() {
-    super.initState();
-    testSupabase();
-  }
-
-  Future<void> testSupabase() async {
-    try {
-      final data = await Supabase.instance.client
-          .from('pricecatcher_full')
-          .select()
-          .limit(20);
-
-      debugPrint(data.toString());
-
-      if (!mounted) return;
-
-      setState(() {
-        status = 'Connected! ${data.length} records received.';
-      });
-    } catch (error) {
-      debugPrint('Supabase error: $error');
-
-      if (!mounted) return;
-
-      setState(() {
-        status = 'Error: $error';
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('SmartJimat'),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text(
-            status,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 20),
-          ),
-        ),
-      ),
     );
   }
 }

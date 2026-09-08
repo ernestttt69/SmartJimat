@@ -79,12 +79,9 @@ class _SellerProfileScreenState
       final fileName =
           '${DateTime.now().millisecondsSinceEpoch}.$extension';
 
-      // Must match your Storage RLS policy:
-      // first folder = current user's UUID
       final filePath =
           '${currentUser.id}/$fileName';
 
-      // Upload to Storage
       await supabase.storage
           .from('profile-images')
           .upload(
@@ -95,12 +92,10 @@ class _SellerProfileScreenState
         ),
       );
 
-      // Get public image URL
       final imageUrl = supabase.storage
           .from('profile-images')
           .getPublicUrl(filePath);
 
-      // Save the URL in public.user
       await supabase
           .from('user')
           .update({
@@ -108,7 +103,6 @@ class _SellerProfileScreenState
       })
           .eq('id', currentUser.id);
 
-      // Reload profile data
       await _loadProfile();
 
       if (!mounted) return;
