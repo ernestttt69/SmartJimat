@@ -1,7 +1,9 @@
+import 'package:assignment/screens/edit_profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/profile_service.dart';
 import 'change_password_screen.dart';
+import 'edit_profile_screen.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
@@ -365,8 +367,19 @@ class _SellerProfileScreenState
             SizedBox(
               height: 55,
               child: FilledButton.icon(
-                onPressed: () {
-                  // Edit profile later
+                onPressed: () async {
+                  final updated = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditProfileScreen(
+                        profile: _profile!,
+                      ),
+                    ),
+                  );
+
+                  if (updated == true) {
+                    _loadProfile();
+                  }
                 },
                 icon: const Icon(Icons.edit_outlined),
                 label: const Text(

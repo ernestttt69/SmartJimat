@@ -41,4 +41,25 @@ class ProfileService {
       'district': premise?['district'],
     };
   }
+
+  Future<void> updateSellerProfile({
+    required String fullName,
+    required String phone,
+    required int premiseCode,
+  }) async {
+    final currentUser = _supabase.auth.currentUser;
+
+    if (currentUser == null) {
+      throw Exception('User is not logged in');
+    }
+
+    await _supabase
+        .from('user')
+        .update({
+      'full_name': fullName,
+      'phone': phone,
+      'premise_code': premiseCode,
+    })
+        .eq('id', currentUser.id);
+  }
 }
