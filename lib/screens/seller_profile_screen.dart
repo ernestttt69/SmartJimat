@@ -1,4 +1,3 @@
-import 'package:assignment/screens/edit_profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/profile_service.dart';
