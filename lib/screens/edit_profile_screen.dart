@@ -221,7 +221,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   )
                 else
                   DropdownButtonFormField<int>(
-                    value: _selectedPremiseCode,
+                    initialValue: _selectedPremiseCode,
                     isExpanded: true,
                     decoration:
                     const InputDecoration(

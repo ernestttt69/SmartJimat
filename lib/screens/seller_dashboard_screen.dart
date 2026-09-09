@@ -15,8 +15,6 @@ class _SellerDashboardScreenState
   static const Color smartJimatGreen = Color(0xFF38BB62);
   static const Color darkText = Color(0xFF333632);
 
-  int _currentIndex = 0;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

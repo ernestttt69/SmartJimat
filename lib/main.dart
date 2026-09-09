@@ -9,7 +9,7 @@ Future<void> main() async {
   
   await Supabase.initialize(
     url: 'https://afggmxyqarbgqedzoxkh.supabase.co',
-    anonKey: 'sb_publishable_lmO5FpN7j9Jfz5oANPWRXg_3auGDfMR',
+    publishableKey: 'sb_publishable_lmO5FpN7j9Jfz5oANPWRXg_3auGDfMR',
   );
 
   await LocalDatabaseService.instance.database;
