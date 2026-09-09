@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'seller_profile_screen.dart';
+import 'add_product_screen.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
   const SellerDashboardScreen({super.key});
@@ -100,8 +101,17 @@ class _SellerDashboardScreenState
                     icon: Icons.add_box_outlined,
                     title: 'Add Product',
                     subtitle: 'Create new item',
-                    onTap: () {
-                      // AddProductScreen later
+                    onTap: () async {
+                      final added = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AddProductScreen(),
+                        ),
+                      );
+
+                      if (added == true) {
+                        // later you can refresh product list here
+                      }
                     },
                   ),
 
