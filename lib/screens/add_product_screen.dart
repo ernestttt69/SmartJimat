@@ -183,24 +183,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _productNameController.text.trim();
 
     if (productName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please enter a product name.',
-          ),
-        ),
+      _showMessage(
+        'Please enter a product name.',
       );
 
       return;
     }
 
     if (_items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'PriceCatcher product data is not available.',
-          ),
-        ),
+      _showMessage(
+        'PriceCatcher product data is not available.',
       );
 
       return;
@@ -216,7 +208,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         productName,
       );
 
-      final exactMatches =
+      final matches =
       _items.where(
             (item) {
           final databaseName =
@@ -235,13 +227,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
         return;
       }
 
-      if (exactMatches.isEmpty) {
+      if (matches.isEmpty) {
         setState(() {
           _productChecked = true;
           _productMatched = false;
           _matchedItemCode = null;
           _matchedItemGroup = null;
-
           _unitController.clear();
           _categoryController.clear();
         });
@@ -249,25 +240,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
         return;
       }
 
-      if (exactMatches.length == 1) {
+      if (matches.length == 1) {
         _selectMatchedItem(
-          exactMatches.first,
+          matches.first,
         );
+
         return;
       }
 
-      final matchedItem =
+      final selected =
       await _showMatchingProducts(
-        exactMatches,
+        matches,
       );
 
-      if (!mounted) {
-        return;
-      }
-
-      if (matchedItem != null) {
+      if (selected != null) {
         _selectMatchedItem(
-          matchedItem,
+          selected,
         );
       }
     } finally {
@@ -303,39 +291,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   0.55,
               child: Column(
                 children: [
-                  Container(
-                    width: 45,
-                    height: 5,
-                    decoration:
-                    BoxDecoration(
-                      color:
-                      Colors.grey.shade300,
-                      borderRadius:
-                      BorderRadius.circular(
-                        10,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 20,
-                  ),
                   const Text(
                     'Select Matching Product',
                     style: TextStyle(
                       fontSize: 21,
                       fontWeight:
                       FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 8,
-                  ),
-                  const Text(
-                    'More than one PriceCatcher item has this product name.',
-                    textAlign:
-                    TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.grey,
                     ),
                   ),
                   const SizedBox(
@@ -351,9 +312,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           context,
                           index,
                           ) =>
-                      const Divider(
-                        height: 1,
-                      ),
+                      const Divider(),
                       itemBuilder:
                           (
                           context,
@@ -363,27 +322,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         matches[index];
 
                         return ListTile(
-                          leading:
-                          const CircleAvatar(
-                            backgroundColor:
-                            Color(
-                              0xFFE8F8ED,
-                            ),
-                            child: Icon(
-                              Icons
-                                  .inventory_2_outlined,
-                              color: Color(
-                                0xFF38BB62,
-                              ),
-                            ),
-                          ),
                           title: Text(
                             item['item']
                                 ?.toString() ??
                                 'Unknown Product',
                           ),
                           subtitle: Text(
-                            '${item['unit'] ?? 'No unit'}'
+                            '${item['unit'] ?? ''}'
                                 '${item['item_category'] != null ? ' • ${item['item_category']}' : ''}',
                           ),
                           onTap: () {
@@ -407,12 +352,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   Future<void> _pickImages() async {
     if (_selectedImages.length >= 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Maximum 5 images allowed',
-          ),
-        ),
+      _showMessage(
+        'Maximum 5 images allowed',
       );
 
       return;
@@ -427,13 +368,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return;
     }
 
-    final remainingSlots =
+    final remaining =
         5 - _selectedImages.length;
 
-    final selectedFiles =
+    final files =
     images
         .take(
-      remainingSlots,
+      remaining,
     )
         .map(
           (image) =>
@@ -449,20 +390,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     setState(() {
       _selectedImages.addAll(
-        selectedFiles,
+        files,
       );
     });
-
-    if (images.length >
-        remainingSlots) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Maximum 5 images allowed',
-          ),
-        ),
-      );
-    }
   }
 
   void _removeImage(
@@ -486,48 +416,32 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _categoryController.text.trim();
 
     if (productName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please enter the product name.',
-          ),
-        ),
+      _showMessage(
+        'Please enter the product name.',
       );
 
       return;
     }
 
     if (!_productChecked) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please check the product with PriceCatcher first.',
-          ),
-        ),
+      _showMessage(
+        'Please check the product with PriceCatcher first.',
       );
 
       return;
     }
 
     if (unit.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please enter the product unit.',
-          ),
-        ),
+      _showMessage(
+        'Please enter the product unit.',
       );
 
       return;
     }
 
     if (category.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please enter the product category.',
-          ),
-        ),
+      _showMessage(
+        'Please enter the product category.',
       );
 
       return;
@@ -540,24 +454,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     if (price == null ||
         price <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please enter a valid selling price.',
-          ),
-        ),
+      _showMessage(
+        'Please enter a valid selling price.',
       );
 
       return;
     }
 
     if (price > 99999.99) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Price cannot exceed RM 99,999.99.',
-          ),
-        ),
+      _showMessage(
+        'Price cannot exceed RM 99,999.99.',
       );
 
       return;
@@ -568,6 +474,87 @@ class _AddProductScreenState extends State<AddProductScreen> {
     });
 
     try {
+      final duplicate =
+      await _productService
+          .findDuplicateProduct(
+        itemCode:
+        _matchedItemCode,
+        productName:
+        productName,
+        unit:
+        unit,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (duplicate != null) {
+        final productId =
+        duplicate['id'] is int
+            ? duplicate['id'] as int
+            : int.parse(
+          duplicate['id']
+              .toString(),
+        );
+
+        final isDeleted =
+            duplicate['is_deleted'] ==
+                true;
+
+        final continueUpdate =
+        await _showDuplicateDialog(
+          isDeleted:
+          isDeleted,
+          currentPrice:
+          (duplicate['price']
+          as num?)
+              ?.toDouble() ??
+              0,
+          newPrice:
+          price,
+        );
+
+        if (!continueUpdate) {
+          return;
+        }
+
+        if (isDeleted) {
+          await _productService
+              .restoreProduct(
+            productId,
+          );
+        }
+
+        await _productService
+            .updateProduct(
+          productId:
+          productId,
+          price:
+          price,
+          newImageFiles:
+          _selectedImages,
+        );
+
+        if (!mounted) {
+          return;
+        }
+
+        _showMessage(
+          isDeleted
+              ? 'Existing product restored and updated.'
+              : 'Existing product updated successfully.',
+          success:
+          true,
+        );
+
+        _resetForm();
+
+        widget.onProductAdded?.call();
+
+        return;
+      }
+
       await _productService.addProduct(
         itemCode:
         _matchedItemCode,
@@ -589,63 +576,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _productMatched
-                ? 'Product added and linked to PriceCatcher.'
-                : 'Product added successfully.',
-          ),
-          backgroundColor:
-          const Color(
-            0xFF38BB62,
-          ),
-        ),
+      _showMessage(
+        _productMatched
+            ? 'Product added and linked to PriceCatcher.'
+            : 'Product added successfully.',
+        success:
+        true,
       );
 
-      _productNameController.removeListener(
-        _onProductNameChanged,
-      );
-
-      setState(() {
-        _matchedItemCode = null;
-        _matchedItemGroup = null;
-
-        _productChecked = false;
-        _productMatched = false;
-
-        _productNameController.clear();
-        _unitController.clear();
-        _categoryController.clear();
-        _priceController.clear();
-
-        _selectedImages.clear();
-      });
-
-      _productNameController.addListener(
-        _onProductNameChanged,
-      );
+      _resetForm();
 
       widget.onProductAdded?.call();
     } catch (e) {
-      debugPrint(
-        'ADD PRODUCT ERROR: $e',
-      );
-
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString(),
-          ),
-          duration:
-          const Duration(
-            seconds: 8,
-          ),
-        ),
+      _showMessage(
+        e.toString(),
       );
     } finally {
       if (mounted) {
@@ -656,178 +604,128 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
-  Widget _buildImageSection() {
-    if (_selectedImages.isEmpty) {
-      return GestureDetector(
-        onTap:
-        _pickImages,
-        child: Container(
-          width:
-          double.infinity,
-          height:
-          190,
-          decoration:
-          BoxDecoration(
-            color:
-            Colors.white,
-            borderRadius:
-            BorderRadius.circular(
-              14,
-            ),
-            border:
-            Border.all(
-              color:
-              Colors.grey.shade300,
-            ),
-          ),
-          child:
-          const Column(
-            mainAxisAlignment:
-            MainAxisAlignment.center,
+  Future<bool> _showDuplicateDialog({
+    required bool isDeleted,
+    required double currentPrice,
+    required double newPrice,
+  }) async {
+    final result =
+    await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Row(
             children: [
               Icon(
-                Icons
-                    .add_photo_alternate_outlined,
-                size: 55,
+                isDeleted
+                    ? Icons
+                    .restore_outlined
+                    : Icons
+                    .warning_amber_rounded,
                 color:
-                Color(
-                  0xFF38BB62,
+                const Color(
+                  0xFFE0A327,
                 ),
               ),
-              SizedBox(
-                height: 12,
+              const SizedBox(
+                width: 10,
               ),
-              Text(
-                'Select Product Images',
-                style:
-                TextStyle(
-                  fontSize: 16,
-                  fontWeight:
-                  FontWeight.w600,
-                ),
-              ),
-              SizedBox(
-                height: 5,
-              ),
-              Text(
-                'Optional • Maximum 5 images',
-                style:
-                TextStyle(
-                  color:
-                  Colors.grey,
+              Expanded(
+                child: Text(
+                  isDeleted
+                      ? 'Product Already Exists'
+                      : 'Duplicate Product',
                 ),
               ),
             ],
           ),
-        ),
-      );
+          content: Text(
+            isDeleted
+                ? 'This product already exists in your deleted products.\n\nPrevious price: RM ${currentPrice.toStringAsFixed(2)}\nNew price: RM ${newPrice.toStringAsFixed(2)}\n\nRestore it and update the price instead?'
+                : 'You already added this product.\n\nCurrent price: RM ${currentPrice.toStringAsFixed(2)}\nNew price: RM ${newPrice.toStringAsFixed(2)}\n\nWould you like to update the existing product instead?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  false,
+                );
+              },
+              child:
+              const Text(
+                'CANCEL',
+              ),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  true,
+                );
+              },
+              child: Text(
+                isDeleted
+                    ? 'RESTORE & UPDATE'
+                    : 'UPDATE PRODUCT',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ??
+        false;
+  }
+
+  void _resetForm() {
+    _productNameController.removeListener(
+      _onProductNameChanged,
+    );
+
+    setState(() {
+      _matchedItemCode = null;
+      _matchedItemGroup = null;
+
+      _productChecked = false;
+      _productMatched = false;
+
+      _productNameController.clear();
+      _unitController.clear();
+      _categoryController.clear();
+      _priceController.clear();
+
+      _selectedImages.clear();
+    });
+
+    _productNameController.addListener(
+      _onProductNameChanged,
+    );
+  }
+
+  void _showMessage(
+      String message, {
+        bool success = false,
+      }) {
+    if (!mounted) {
+      return;
     }
 
-    return Column(
-      children: [
-        SizedBox(
-          height:
-          145,
-          child:
-          ListView.separated(
-            scrollDirection:
-            Axis.horizontal,
-            itemCount:
-            _selectedImages.length,
-            separatorBuilder:
-                (
-                context,
-                index,
-                ) =>
-            const SizedBox(
-              width:
-              12,
-            ),
-            itemBuilder:
-                (
-                context,
-                index,
-                ) {
-              return Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius:
-                    BorderRadius.circular(
-                      12,
-                    ),
-                    child:
-                    Image.file(
-                      _selectedImages[
-                      index],
-                      width:
-                      145,
-                      height:
-                      145,
-                      fit:
-                      BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    top:
-                    6,
-                    right:
-                    6,
-                    child:
-                    GestureDetector(
-                      onTap:
-                          () {
-                        _removeImage(
-                          index,
-                        );
-                      },
-                      child:
-                      const CircleAvatar(
-                        radius:
-                        15,
-                        backgroundColor:
-                        Colors.black54,
-                        child:
-                        Icon(
-                          Icons.close,
-                          size:
-                          17,
-                          color:
-                          Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content:
+        Text(
+          message,
         ),
-        const SizedBox(
-          height:
-          12,
-        ),
-        if (_selectedImages.length < 5)
-          SizedBox(
-            width:
-            double.infinity,
-            height:
-            48,
-            child:
-            OutlinedButton.icon(
-              onPressed:
-              _pickImages,
-              icon:
-              const Icon(
-                Icons
-                    .add_photo_alternate_outlined,
-              ),
-              label:
-              const Text(
-                'ADD MORE IMAGES',
-              ),
-            ),
-          ),
-      ],
+        backgroundColor:
+        success
+            ? const Color(
+          0xFF38BB62,
+        )
+            : null,
+      ),
     );
   }
 
@@ -851,11 +749,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
               '',
           optionsBuilder:
               (
-              TextEditingValue
-              textEditingValue,
+              TextEditingValue value,
               ) {
             final query =
-            textEditingValue.text
+            value.text
                 .trim()
                 .toLowerCase();
 
@@ -864,7 +761,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   Map<String, dynamic>>.empty();
             }
 
-            final startsWithMatches =
+            final start =
             _items.where(
                   (item) {
                 final name =
@@ -879,7 +776,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               },
             );
 
-            final containsMatches =
+            final contains =
             _items.where(
                   (item) {
                 final name =
@@ -898,8 +795,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
             );
 
             return [
-              ...startsWithMatches,
-              ...containsMatches,
+              ...start,
+              ...contains,
             ].take(
               8,
             );
@@ -911,7 +808,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               context,
               controller,
               focusNode,
-              onFieldSubmitted,
+              onSubmitted,
               ) {
             return TextField(
               controller:
@@ -936,8 +833,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     ? IconButton(
                   onPressed:
                       () {
-                    controller.clear();
-                    focusNode.requestFocus();
+                    controller
+                        .clear();
+
+                    focusNode
+                        .requestFocus();
                   },
                   icon:
                   const Icon(
@@ -956,22 +856,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     12,
                   ),
                 ),
-                focusedBorder:
-                OutlineInputBorder(
-                  borderRadius:
-                  BorderRadius.circular(
-                    12,
-                  ),
-                  borderSide:
-                  const BorderSide(
-                    color:
-                    Color(
-                      0xFF38BB62,
-                    ),
-                    width:
-                    1.5,
-                  ),
-                ),
               ),
             );
           },
@@ -981,7 +865,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               onSelected,
               options,
               ) {
-            final suggestions =
+            final items =
             options.toList();
 
             return Align(
@@ -996,12 +880,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 BorderRadius.circular(
                   12,
                 ),
-                child:
-                SizedBox(
+                child: SizedBox(
                   width:
                   constraints.maxWidth,
-                  child:
-                  ConstrainedBox(
+                  child: ConstrainedBox(
                     constraints:
                     const BoxConstraints(
                       maxHeight:
@@ -1014,15 +896,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       shrinkWrap:
                       true,
                       itemCount:
-                      suggestions.length,
+                      items.length,
                       separatorBuilder:
                           (
                           context,
                           index,
                           ) =>
                       const Divider(
-                        height:
-                        1,
+                        height: 1,
                       ),
                       itemBuilder:
                           (
@@ -1030,60 +911,27 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           index,
                           ) {
                         final item =
-                        suggestions[
-                        index];
-
-                        final productName =
-                            item['item']
-                                ?.toString() ??
-                                'Unknown Product';
-
-                        final unit =
-                            item['unit']
-                                ?.toString() ??
-                                '';
-
-                        final category =
-                            item['item_category']
-                                ?.toString() ??
-                                '';
+                        items[index];
 
                         return ListTile(
                           leading:
-                          const CircleAvatar(
-                            backgroundColor:
+                          const Icon(
+                            Icons.search,
+                            color:
                             Color(
-                              0xFFE8F8ED,
-                            ),
-                            child: Icon(
-                              Icons.search,
-                              color: Color(
-                                0xFF38BB62,
-                              ),
+                              0xFF38BB62,
                             ),
                           ),
                           title: Text(
-                            productName,
-                            maxLines:
-                            2,
-                            overflow:
-                            TextOverflow.ellipsis,
+                            item['item']
+                                ?.toString() ??
+                                'Unknown Product',
                           ),
                           subtitle: Text(
-                            [
-                              unit,
-                              category,
-                            ]
-                                .where(
-                                  (value) =>
-                              value.isNotEmpty,
-                            )
-                                .join(
-                              ' • ',
-                            ),
+                            '${item['unit'] ?? ''}'
+                                '${item['item_category'] != null ? ' • ${item['item_category']}' : ''}',
                           ),
-                          onTap:
-                              () {
+                          onTap: () {
                             onSelected(
                               item,
                             );
@@ -1106,105 +954,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return const SizedBox.shrink();
     }
 
-    if (_productMatched) {
-      return Container(
-        width:
-        double.infinity,
-        padding:
-        const EdgeInsets.all(
-          14,
-        ),
-        decoration:
-        BoxDecoration(
-          color:
-          const Color(
-            0xFFE8F8ED,
-          ),
-          borderRadius:
-          BorderRadius.circular(
-            12,
-          ),
-          border:
-          Border.all(
-            color:
-            const Color(
-              0xFF38BB62,
-            ),
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            const Icon(
-              Icons
-                  .check_circle_outline,
-              color:
-              Color(
-                0xFF38BB62,
-              ),
-            ),
-            const SizedBox(
-              width:
-              10,
-            ),
-            Expanded(
-              child:
-              Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Product found in PriceCatcher',
-                    style:
-                    TextStyle(
-                      fontWeight:
-                      FontWeight.bold,
-                      color:
-                      Color(
-                        0xFF247F43,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(
-                    height:
-                    4,
-                  ),
-                  Text(
-                    'Item Code: ${_matchedItemCode ?? '-'}',
-                    style:
-                    const TextStyle(
-                      fontSize:
-                      13,
-                      color:
-                      Color(
-                        0xFF247F43,
-                      ),
-                    ),
-                  ),
-                  if (_matchedItemGroup != null &&
-                      _matchedItemGroup!
-                          .isNotEmpty)
-                    Text(
-                      'Group: $_matchedItemGroup',
-                      style:
-                      const TextStyle(
-                        fontSize:
-                        13,
-                        color:
-                        Color(
-                          0xFF247F43,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Container(
       width:
       double.infinity,
@@ -1215,48 +964,42 @@ class _AddProductScreenState extends State<AddProductScreen> {
       decoration:
       BoxDecoration(
         color:
-        const Color(
+        _productMatched
+            ? const Color(
+          0xFFE8F8ED,
+        )
+            : const Color(
           0xFFFFF7E6,
         ),
         borderRadius:
         BorderRadius.circular(
           12,
         ),
-        border:
-        Border.all(
-          color:
-          const Color(
-            0xFFE0A327,
-          ),
-        ),
       ),
-      child:
-      const Row(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
+      child: Row(
         children: [
           Icon(
-            Icons.info_outline,
+            _productMatched
+                ? Icons
+                .check_circle_outline
+                : Icons.info_outline,
             color:
-            Color(
+            _productMatched
+                ? const Color(
+              0xFF38BB62,
+            )
+                : const Color(
               0xFFB87900,
             ),
           ),
-          SizedBox(
-            width:
-            10,
+          const SizedBox(
+            width: 10,
           ),
           Expanded(
-            child:
-            Text(
-              'Product not found in PriceCatcher. Please enter the unit and category manually.',
-              style:
-              TextStyle(
-                color:
-                Color(
-                  0xFF8A5A00,
-                ),
-              ),
+            child: Text(
+              _productMatched
+                  ? 'Product found in PriceCatcher. Item Code: ${_matchedItemCode ?? '-'}'
+                  : 'Product not found in PriceCatcher. Enter the unit and category manually.',
             ),
           ),
         ],
@@ -1269,7 +1012,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     required String label,
     required String hint,
     required IconData icon,
-    bool enabled = true,
+    required bool enabled,
     bool readOnly = false,
   }) {
     return TextField(
@@ -1279,8 +1022,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
       enabled,
       readOnly:
       readOnly,
-      textCapitalization:
-      TextCapitalization.words,
       decoration:
       InputDecoration(
         labelText:
@@ -1294,15 +1035,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
         filled:
         true,
         fillColor:
-        !enabled
-            ? const Color(
+        enabled
+            ? Colors.white
+            : const Color(
           0xFFE9E9E9,
-        )
-            : readOnly
-            ? const Color(
-          0xFFF1F3F1,
-        )
-            : Colors.white,
+        ),
         border:
         OutlineInputBorder(
           borderRadius:
@@ -1310,53 +1047,160 @@ class _AddProductScreenState extends State<AddProductScreen> {
             12,
           ),
         ),
-        enabledBorder:
-        OutlineInputBorder(
-          borderRadius:
-          BorderRadius.circular(
-            12,
-          ),
-          borderSide:
-          BorderSide(
-            color:
-            Colors.grey.shade400,
-          ),
-        ),
-        focusedBorder:
-        OutlineInputBorder(
-          borderRadius:
-          BorderRadius.circular(
-            12,
-          ),
-          borderSide:
-          const BorderSide(
-            color:
-            Color(
-              0xFF38BB62,
-            ),
-            width:
-            1.5,
-          ),
-        ),
-        disabledBorder:
-        OutlineInputBorder(
-          borderRadius:
-          BorderRadius.circular(
-            12,
-          ),
-          borderSide:
-          BorderSide(
-            color:
-            Colors.grey.shade300,
-          ),
-        ),
       ),
+    );
+  }
+
+  Widget _buildImages() {
+    if (_selectedImages.isEmpty) {
+      return GestureDetector(
+        onTap:
+        _pickImages,
+        child: Container(
+          height:
+          180,
+          width:
+          double.infinity,
+          decoration:
+          BoxDecoration(
+            color:
+            Colors.white,
+            borderRadius:
+            BorderRadius.circular(
+              14,
+            ),
+            border:
+            Border.all(
+              color:
+              Colors.grey.shade300,
+            ),
+          ),
+          child:
+          const Column(
+            mainAxisAlignment:
+            MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons
+                    .add_photo_alternate_outlined,
+                size:
+                50,
+                color:
+                Color(
+                  0xFF38BB62,
+                ),
+              ),
+              SizedBox(
+                height:
+                10,
+              ),
+              Text(
+                'Select Product Images',
+              ),
+              Text(
+                'Optional • Maximum 5 images',
+                style:
+                TextStyle(
+                  color:
+                  Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        SizedBox(
+          height:
+          140,
+          child:
+          ListView.separated(
+            scrollDirection:
+            Axis.horizontal,
+            itemCount:
+            _selectedImages.length,
+            separatorBuilder:
+                (
+                context,
+                index,
+                ) =>
+            const SizedBox(
+              width:
+              10,
+            ),
+            itemBuilder:
+                (
+                context,
+                index,
+                ) {
+              return Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius:
+                    BorderRadius.circular(
+                      12,
+                    ),
+                    child: Image.file(
+                      _selectedImages[
+                      index],
+                      width:
+                      140,
+                      height:
+                      140,
+                      fit:
+                      BoxFit.cover,
+                    ),
+                  ),
+                  Positioned(
+                    right:
+                    5,
+                    top:
+                    5,
+                    child: IconButton(
+                      onPressed:
+                          () {
+                        _removeImage(
+                          index,
+                        );
+                      },
+                      icon:
+                      const Icon(
+                        Icons.cancel,
+                        color:
+                        Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        if (_selectedImages.length < 5)
+          TextButton.icon(
+            onPressed:
+            _pickImages,
+            icon:
+            const Icon(
+              Icons
+                  .add_photo_alternate_outlined,
+            ),
+            label:
+            const Text(
+              'Add More Images',
+            ),
+          ),
+      ],
     );
   }
 
   @override
   void dispose() {
-    _productNameController.removeListener(
+    _productNameController
+        .removeListener(
       _onProductNameChanged,
     );
 
@@ -1378,14 +1222,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
       const Color(
         0xFFF6F7F6,
       ),
-      appBar: AppBar(
+      appBar:
+      AppBar(
         title:
         const Text(
           'Add Product',
         ),
         backgroundColor:
-        Colors.white,
-        surfaceTintColor:
         Colors.white,
       ),
       body:
@@ -1418,21 +1261,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               const SizedBox(
                 height:
-                6,
-              ),
-              Text(
-                '${_selectedImages.length}/5 images selected',
-                style:
-                const TextStyle(
-                  color:
-                  Colors.grey,
-                ),
-              ),
-              const SizedBox(
-                height:
                 15,
               ),
-              _buildImageSection(),
+              _buildImages(),
               const SizedBox(
                 height:
                 30,
@@ -1449,19 +1280,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               const SizedBox(
                 height:
-                6,
-              ),
-              const Text(
-                'Start typing to see similar PriceCatcher products.',
-                style:
-                TextStyle(
-                  color:
-                  Colors.grey,
-                ),
-              ),
-              const SizedBox(
-                height:
-                16,
+                15,
               ),
               _buildProductAutocomplete(),
               const SizedBox(
@@ -1471,8 +1290,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
               SizedBox(
                 width:
                 double.infinity,
-                height:
-                48,
                 child:
                 OutlinedButton.icon(
                   onPressed:
@@ -1480,19 +1297,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       ? null
                       : _checkProduct,
                   icon:
-                  _isCheckingProduct
-                      ? const SizedBox(
-                    width:
-                    18,
-                    height:
-                    18,
-                    child:
-                    CircularProgressIndicator(
-                      strokeWidth:
-                      2,
-                    ),
-                  )
-                      : const Icon(
+                  const Icon(
                     Icons.search,
                   ),
                   label:
@@ -1508,20 +1313,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 14,
               ),
               _buildMatchStatus(),
-              if (_productChecked)
-                const SizedBox(
-                  height:
-                  18,
-                ),
+              const SizedBox(
+                height:
+                18,
+              ),
               _buildTextField(
                 controller:
                 _unitController,
                 label:
                 'Unit',
                 hint:
-                'Example: 1 KG, 500 ML, 10 PCS',
+                'Example: 1 KG',
                 icon:
-                Icons.straighten_outlined,
+                Icons
+                    .straighten_outlined,
                 enabled:
                 _productMatched ||
                     _canEditManualFields,
@@ -1540,7 +1345,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 hint:
                 'Example: Beverages',
                 icon:
-                Icons.category_outlined,
+                Icons
+                    .category_outlined,
                 enabled:
                 _productMatched ||
                     _canEditManualFields,
@@ -1578,7 +1384,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   'RM ',
                   prefixIcon:
                   const Icon(
-                    Icons.payments_outlined,
+                    Icons
+                        .payments_outlined,
                   ),
                   filled:
                   true,
@@ -1589,22 +1396,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     borderRadius:
                     BorderRadius.circular(
                       12,
-                    ),
-                  ),
-                  focusedBorder:
-                  OutlineInputBorder(
-                    borderRadius:
-                    BorderRadius.circular(
-                      12,
-                    ),
-                    borderSide:
-                    const BorderSide(
-                      color:
-                      Color(
-                        0xFF38BB62,
-                      ),
-                      width:
-                      1.5,
                     ),
                   ),
                 ),
@@ -1646,11 +1437,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     _isSaving
                         ? 'ADDING PRODUCT...'
                         : 'ADD PRODUCT',
-                    style:
-                    const TextStyle(
-                      fontWeight:
-                      FontWeight.w600,
-                    ),
                   ),
                 ),
               ),

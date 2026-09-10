@@ -19,6 +19,79 @@ class ProductService {
     );
   }
 
+  Future<Map<String, dynamic>?> findDuplicateProduct({
+    int? itemCode,
+    required String productName,
+    required String unit,
+  }) async {
+    final currentUser =
+        _supabase.auth.currentUser;
+
+    if (currentUser == null) {
+      throw Exception(
+        'User is not logged in',
+      );
+    }
+
+    if (itemCode != null) {
+      final response = await _supabase
+          .from('seller_products')
+          .select(
+        'id, item_code, price, is_deleted, custom_item_name, custom_unit',
+      )
+          .eq(
+        'seller_id',
+        currentUser.id,
+      )
+          .eq(
+        'item_code',
+        itemCode,
+      )
+          .maybeSingle();
+
+      if (response == null) {
+        return null;
+      }
+
+      return Map<String, dynamic>.from(
+        response,
+      );
+    }
+
+    final response = await _supabase
+        .from('seller_products')
+        .select(
+      'id, item_code, price, is_deleted, custom_item_name, custom_unit',
+    )
+        .eq(
+      'seller_id',
+      currentUser.id,
+    )
+        .isFilter(
+      'item_code',
+      null,
+    )
+        .ilike(
+      'custom_item_name',
+      productName.trim(),
+    )
+        .ilike(
+      'custom_unit',
+      unit.trim(),
+    );
+
+    final rows =
+    List<Map<String, dynamic>>.from(
+      response,
+    );
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    return rows.first;
+  }
+
   Future<List<Map<String, dynamic>>>
   getSellerProducts() async {
     final currentUser =
@@ -107,15 +180,13 @@ class ProductService {
         'created_at',
       );
 
-      final images =
-      List<Map<String, dynamic>>.from(
-        imageResponse,
-      );
-
       result.add({
         ...product,
         'lookup_item': item,
-        'seller_product_images': images,
+        'seller_product_images':
+        List<Map<String, dynamic>>.from(
+          imageResponse,
+        ),
       });
     }
 
@@ -210,15 +281,13 @@ class ProductService {
         'created_at',
       );
 
-      final images =
-      List<Map<String, dynamic>>.from(
-        imageResponse,
-      );
-
       result.add({
         ...product,
         'lookup_item': item,
-        'seller_product_images': images,
+        'seller_product_images':
+        List<Map<String, dynamic>>.from(
+          imageResponse,
+        ),
       });
     }
 
@@ -237,7 +306,7 @@ class ProductService {
       );
     }
 
-    final productResponse = await _supabase
+    final response = await _supabase
         .from('seller_products')
         .select(
       'id, seller_id, premise_code, item_code, price, created_at, is_deleted, deleted_at, custom_item_name, custom_unit, custom_category',
@@ -254,7 +323,7 @@ class ProductService {
 
     final product =
     Map<String, dynamic>.from(
-      productResponse,
+      response,
     );
 
     final itemCode =
@@ -305,9 +374,7 @@ class ProductService {
     if (premiseCode != null) {
       final premiseResponse =
       await _supabase
-          .from(
-        'lookup_premise',
-      )
+          .from('lookup_premise')
           .select(
         'premise_code, premise, address, premise_type, state, district',
       )
@@ -338,20 +405,18 @@ class ProductService {
       'created_at',
     );
 
-    final images =
-    List<Map<String, dynamic>>.from(
-      imageResponse,
-    );
-
     return {
       ...product,
       'lookup_item': item,
       'lookup_premise': premise,
-      'seller_product_images': images,
+      'seller_product_images':
+      List<Map<String, dynamic>>.from(
+        imageResponse,
+      ),
     };
   }
 
-  Future<void> addProduct({
+  Future<int> addProduct({
     int? itemCode,
     required String productName,
     required String unit,
@@ -391,107 +456,67 @@ class ProductService {
       );
     }
 
-    if (productName.trim().isEmpty) {
+    final duplicate =
+    await findDuplicateProduct(
+      itemCode: itemCode,
+      productName: productName,
+      unit: unit,
+    );
+
+    if (duplicate != null) {
       throw Exception(
-        'Product name is required.',
+        'DUPLICATE_PRODUCT:${duplicate['id']}',
       );
     }
 
-    if (unit.trim().isEmpty) {
-      throw Exception(
-        'Product unit is required.',
-      );
-    }
+    final Map<String, dynamic> data = {
+      'seller_id':
+      currentUser.id,
+      'premise_code':
+      premiseCode,
+      'item_code':
+      itemCode,
+      'price':
+      price,
+      'is_deleted':
+      false,
+      'deleted_at':
+      null,
+    };
 
-    if (category.trim().isEmpty) {
-      throw Exception(
-        'Product category is required.',
-      );
-    }
+    if (itemCode == null) {
+      data['custom_item_name'] =
+          productName.trim();
 
-    if (price <= 0 ||
-        price > 99999.99) {
-      throw Exception(
-        'Please enter a valid selling price.',
-      );
-    }
+      data['custom_unit'] =
+          unit.trim();
 
-    late Map<String, dynamic>
-    productResponse;
-
-    if (itemCode != null) {
-      final response = await _supabase
-          .from('seller_products')
-          .upsert(
-        {
-          'seller_id':
-          currentUser.id,
-          'premise_code':
-          premiseCode,
-          'item_code':
-          itemCode,
-          'price':
-          price,
-          'custom_item_name':
-          null,
-          'custom_unit':
-          null,
-          'custom_category':
-          null,
-          'is_deleted':
-          false,
-          'deleted_at':
-          null,
-        },
-        onConflict:
-        'seller_id,premise_code,item_code',
-      )
-          .select(
-        'id',
-      )
-          .single();
-
-      productResponse =
-      Map<String, dynamic>.from(
-        response,
-      );
+      data['custom_category'] =
+          category.trim();
     } else {
-      final response = await _supabase
-          .from('seller_products')
-          .insert({
-        'seller_id':
-        currentUser.id,
-        'premise_code':
-        premiseCode,
-        'item_code':
-        null,
-        'price':
-        price,
-        'custom_item_name':
-        productName.trim(),
-        'custom_unit':
-        unit.trim(),
-        'custom_category':
-        category.trim(),
-        'is_deleted':
-        false,
-        'deleted_at':
-        null,
-      })
-          .select(
-        'id',
-      )
-          .single();
+      data['custom_item_name'] =
+      null;
 
-      productResponse =
-      Map<String, dynamic>.from(
-        response,
-      );
+      data['custom_unit'] =
+      null;
+
+      data['custom_category'] =
+      null;
     }
+
+    final response = await _supabase
+        .from('seller_products')
+        .insert(
+      data,
+    )
+        .select(
+      'id',
+    )
+        .single();
 
     final productId =
     _toInt(
-      productResponse['id'],
+      response['id'],
     );
 
     if (productId == null) {
@@ -502,10 +527,14 @@ class ProductService {
 
     if (imageFiles.isNotEmpty) {
       await _uploadProductImages(
-        productId: productId,
-        imageFiles: imageFiles,
+        productId:
+        productId,
+        imageFiles:
+        imageFiles,
       );
     }
+
+    return productId;
   }
 
   Future<void> updateProduct({
@@ -519,13 +548,6 @@ class ProductService {
     if (currentUser == null) {
       throw Exception(
         'User is not logged in',
-      );
-    }
-
-    if (price <= 0 ||
-        price > 99999.99) {
-      throw Exception(
-        'Please enter a valid selling price.',
       );
     }
 
@@ -558,7 +580,8 @@ class ProductService {
     await _supabase
         .from('seller_products')
         .update({
-      'price': price,
+      'price':
+      price,
     })
         .eq(
       'id',
@@ -577,6 +600,36 @@ class ProductService {
         newImageFiles,
       );
     }
+  }
+
+  Future<void> restoreProduct(
+      int productId,
+      ) async {
+    final currentUser =
+        _supabase.auth.currentUser;
+
+    if (currentUser == null) {
+      throw Exception(
+        'User is not logged in',
+      );
+    }
+
+    await _supabase
+        .from('seller_products')
+        .update({
+      'is_deleted':
+      false,
+      'deleted_at':
+      null,
+    })
+        .eq(
+      'id',
+      productId,
+    )
+        .eq(
+      'seller_id',
+      currentUser.id,
+    );
   }
 
   Future<void> softDeleteProduct(
@@ -599,36 +652,6 @@ class ProductService {
       'deleted_at':
       DateTime.now()
           .toIso8601String(),
-    })
-        .eq(
-      'id',
-      productId,
-    )
-        .eq(
-      'seller_id',
-      currentUser.id,
-    );
-  }
-
-  Future<void> restoreProduct(
-      int productId,
-      ) async {
-    final currentUser =
-        _supabase.auth.currentUser;
-
-    if (currentUser == null) {
-      throw Exception(
-        'User is not logged in',
-      );
-    }
-
-    await _supabase
-        .from('seller_products')
-        .update({
-      'is_deleted':
-      false,
-      'deleted_at':
-      null,
     })
         .eq(
       'id',
@@ -766,9 +789,7 @@ class ProductService {
       String filePath,
       ) {
     final parts =
-    filePath.split(
-      '.',
-    );
+    filePath.split('.');
 
     if (parts.length < 2) {
       return 'jpg';
