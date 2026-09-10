@@ -274,4 +274,115 @@ class ProductService {
       rethrow;
     }
   }
+
+  Future<List<Map<String, dynamic>>>
+  getDeletedSellerProducts() async {
+    final currentUser =
+        _supabase.auth.currentUser;
+
+    if (currentUser == null) {
+      throw Exception(
+        'User is not logged in',
+      );
+    }
+
+    final response = await _supabase
+        .from('seller_products')
+        .select(
+      'id, seller_id, premise_code, item_code, price, created_at, is_deleted, deleted_at',
+    )
+        .eq(
+      'seller_id',
+      currentUser.id,
+    )
+        .eq(
+      'is_deleted',
+      true,
+    )
+        .order(
+      'deleted_at',
+      ascending: false,
+    );
+
+    final products =
+    List<Map<String, dynamic>>.from(
+      response,
+    );
+
+    final List<Map<String, dynamic>> result = [];
+
+    for (final product in products) {
+      final itemResponse = await _supabase
+          .from('lookup_item')
+          .select(
+        'item, unit, item_group, item_category',
+      )
+          .eq(
+        'item_code',
+        product['item_code'],
+      )
+          .maybeSingle();
+
+      final imagesResponse = await _supabase
+          .from('seller_product_images')
+          .select(
+        'id, image_url',
+      )
+          .eq(
+        'product_id',
+        product['id'],
+      )
+          .order(
+        'id',
+        ascending: true,
+      );
+
+      result.add({
+        ...product,
+        'lookup_item': itemResponse == null
+            ? null
+            : Map<String, dynamic>.from(
+          itemResponse,
+        ),
+        'seller_product_images':
+        List<Map<String, dynamic>>.from(
+          imagesResponse,
+        ),
+      });
+    }
+
+    return result;
+  }
+
+
+  Future<void> restoreProduct(
+      int productId,
+      ) async {
+    final currentUser =
+        _supabase.auth.currentUser;
+
+    if (currentUser == null) {
+      throw Exception(
+        'User is not logged in',
+      );
+    }
+
+    await _supabase
+        .from('seller_products')
+        .update({
+      'is_deleted':
+      false,
+      'deleted_at':
+      null,
+    })
+        .eq(
+      'id',
+      productId,
+    )
+        .eq(
+      'seller_id',
+      currentUser.id,
+    );
+  }
+
 }
