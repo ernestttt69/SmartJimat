@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/data_gov_service.dart';
 import '../services/product_service.dart';
 
 class AddProductScreen extends StatefulWidget {
@@ -19,37 +21,55 @@ class AddProductScreen extends StatefulWidget {
       _AddProductScreenState();
 }
 
-class _AddProductScreenState extends State<AddProductScreen> {
+class _AddProductScreenState
+    extends State<AddProductScreen> {
   final ProductService _productService =
   ProductService();
 
-  final TextEditingController _productNameController =
+  final DataGovService _dataGovService =
+  DataGovService();
+
+  final ImagePicker _imagePicker =
+  ImagePicker();
+
+  final TextEditingController
+  _productNameController =
   TextEditingController();
 
-  final TextEditingController _unitController =
+  final TextEditingController
+  _unitController =
   TextEditingController();
 
-  final TextEditingController _categoryController =
+  final TextEditingController
+  _categoryController =
   TextEditingController();
 
-  final TextEditingController _priceController =
+  final TextEditingController
+  _priceController =
   TextEditingController();
 
   final FocusNode _productNameFocusNode =
   FocusNode();
 
-  final ImagePicker _imagePicker =
-  ImagePicker();
+  List<Map<String, dynamic>> _items =
+  [];
 
-  List<Map<String, dynamic>> _items = [];
-  List<File> _selectedImages = [];
+  final List<File> _selectedImages =
+  [];
 
   int? _matchedItemCode;
+  int? _sellerPremiseCode;
+
   String? _matchedItemGroup;
+
+  Map<String, dynamic>?
+  _priceCatcherPrice;
 
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isCheckingProduct = false;
+  bool _isLoadingPrice = false;
+
   bool _productChecked = false;
   bool _productMatched = false;
 
@@ -62,25 +82,77 @@ class _AddProductScreenState extends State<AddProductScreen> {
   void initState() {
     super.initState();
 
-    _loadItems();
-
     _productNameController.addListener(
       _onProductNameChanged,
     );
+
+    _loadLatestData();
   }
 
-  Future<void> _loadItems() async {
+  Future<void> _loadLatestData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
-      final items =
-      await _productService.getItems();
+      final currentUser =
+          Supabase
+              .instance
+              .client
+              .auth
+              .currentUser;
+
+      if (currentUser == null) {
+        throw Exception(
+          'User is not logged in.',
+        );
+      }
+
+      final profile =
+      await Supabase.instance.client
+          .from('user')
+          .select(
+        'premise_code',
+      )
+          .eq(
+        'id',
+        currentUser.id,
+      )
+          .single();
+
+      final premiseCode =
+      profile['premise_code'];
+
+      final parsedPremiseCode =
+      premiseCode is int
+          ? premiseCode
+          : int.tryParse(
+        premiseCode.toString(),
+      );
+
+      if (parsedPremiseCode == null) {
+        throw Exception(
+          'Seller premise code is not available.',
+        );
+      }
+
+      final latestItems =
+      await _dataGovService
+          .getLatestItems();
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _items = items;
-        _isLoading = false;
+        _sellerPremiseCode =
+            parsedPremiseCode;
+
+        _items =
+            latestItems;
+
+        _isLoading =
+        false;
       });
     } catch (e) {
       if (!mounted) {
@@ -91,11 +163,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
         _isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to load PriceCatcher products: $e',
+            'Unable to get the latest PriceCatcher data: $e',
           ),
+          backgroundColor:
+          Colors.red,
         ),
       );
     }
@@ -103,17 +178,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   void _onProductNameChanged() {
     if (!_productChecked &&
-        !_productMatched) {
+        !_productMatched &&
+        _priceCatcherPrice == null) {
       return;
     }
 
     setState(() {
-      _productChecked = false;
-      _productMatched = false;
-      _matchedItemCode = null;
-      _matchedItemGroup = null;
+      _matchedItemCode =
+      null;
+
+      _matchedItemGroup =
+      null;
+
+      _productChecked =
+      false;
+
+      _productMatched =
+      false;
+
+      _priceCatcherPrice =
+      null;
 
       _unitController.clear();
+
       _categoryController.clear();
     });
   }
@@ -125,31 +212,59 @@ class _AddProductScreenState extends State<AddProductScreen> {
         .trim()
         .toLowerCase()
         .replaceAll(
-      RegExp(r'\s+'),
+      RegExp(
+        r'\s+',
+      ),
       ' ',
     );
   }
 
-  void _selectMatchedItem(
-      Map<String, dynamic> item,
+  int? _toInt(
+      dynamic value,
       ) {
-    final itemCode =
-    item['item_code'];
+    if (value == null) {
+      return null;
+    }
 
-    _productNameController.removeListener(
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    return int.tryParse(
+      value.toString(),
+    );
+  }
+
+  Future<void> _selectMatchedItem(
+      Map<String, dynamic> item,
+      ) async {
+    final itemCode =
+    _toInt(
+      item['item_code'],
+    );
+
+    if (itemCode == null) {
+      return;
+    }
+
+    _productNameController
+        .removeListener(
       _onProductNameChanged,
     );
 
     setState(() {
-      _productChecked = true;
-      _productMatched = true;
+      _productChecked =
+      true;
+
+      _productMatched =
+      true;
 
       _matchedItemCode =
-      itemCode is int
-          ? itemCode
-          : int.tryParse(
-        itemCode.toString(),
-      );
+          itemCode;
 
       _matchedItemGroup =
           item['item_group']
@@ -169,13 +284,80 @@ class _AddProductScreenState extends State<AddProductScreen> {
           item['item_category']
               ?.toString() ??
               '';
+
+      _priceCatcherPrice =
+      null;
     });
 
-    _productNameController.addListener(
+    _productNameController
+        .addListener(
       _onProductNameChanged,
     );
 
-    _productNameFocusNode.unfocus();
+    _productNameFocusNode
+        .unfocus();
+
+    await _loadLatestItemPrice(
+      itemCode,
+    );
+  }
+
+  Future<void> _loadLatestItemPrice(
+      int itemCode,
+      ) async {
+    if (_sellerPremiseCode == null) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingPrice =
+      true;
+
+      _priceCatcherPrice =
+      null;
+    });
+
+    try {
+      final price =
+      await _dataGovService
+          .getLatestItemPriceAtPremise(
+        itemCode:
+        itemCode,
+        premiseCode:
+        _sellerPremiseCode!,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _priceCatcherPrice =
+            price;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            'Unable to get latest PriceCatcher price: $e',
+          ),
+          backgroundColor:
+          Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingPrice =
+          false;
+        });
+      }
+    }
   }
 
   Future<void> _checkProduct() async {
@@ -192,14 +374,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     if (_items.isEmpty) {
       _showMessage(
-        'PriceCatcher product data is not available.',
+        'Latest PriceCatcher item data is not available.',
       );
 
       return;
     }
 
     setState(() {
-      _isCheckingProduct = true;
+      _isCheckingProduct =
+      true;
     });
 
     try {
@@ -211,14 +394,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final matches =
       _items.where(
             (item) {
-          final databaseName =
+          final name =
           _normalizeText(
             item['item']
                 ?.toString() ??
                 '',
           );
 
-          return databaseName ==
+          return name ==
               normalizedInput;
         },
       ).toList();
@@ -229,11 +412,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       if (matches.isEmpty) {
         setState(() {
-          _productChecked = true;
-          _productMatched = false;
-          _matchedItemCode = null;
-          _matchedItemGroup = null;
+          _productChecked =
+          true;
+
+          _productMatched =
+          false;
+
+          _matchedItemCode =
+          null;
+
+          _matchedItemGroup =
+          null;
+
+          _priceCatcherPrice =
+          null;
+
           _unitController.clear();
+
           _categoryController.clear();
         });
 
@@ -241,7 +436,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
 
       if (matches.length == 1) {
-        _selectMatchedItem(
+        await _selectMatchedItem(
           matches.first,
         );
 
@@ -254,14 +449,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
       );
 
       if (selected != null) {
-        _selectMatchedItem(
+        await _selectMatchedItem(
           selected,
         );
       }
     } finally {
       if (mounted) {
         setState(() {
-          _isCheckingProduct = false;
+          _isCheckingProduct =
+          false;
         });
       }
     }
@@ -273,10 +469,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
       ) async {
     return showModalBottomSheet<
         Map<String, dynamic>>(
-      context: context,
-      backgroundColor: Colors.white,
-      isScrollControlled: true,
-      builder: (context) {
+      context:
+      context,
+      backgroundColor:
+      Colors.white,
+      isScrollControlled:
+      true,
+      builder:
+          (context) {
         return SafeArea(
           child: Padding(
             padding:
@@ -285,22 +485,25 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ),
             child: SizedBox(
               height:
-              MediaQuery.of(context)
-                  .size
-                  .height *
+              MediaQuery.of(
+                context,
+              ).size.height *
                   0.55,
               child: Column(
                 children: [
                   const Text(
                     'Select Matching Product',
-                    style: TextStyle(
-                      fontSize: 21,
+                    style:
+                    TextStyle(
+                      fontSize:
+                      21,
                       fontWeight:
                       FontWeight.bold,
                     ),
                   ),
                   const SizedBox(
-                    height: 20,
+                    height:
+                    20,
                   ),
                   Expanded(
                     child:
@@ -322,16 +525,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         matches[index];
 
                         return ListTile(
-                          title: Text(
+                          title:
+                          Text(
                             item['item']
                                 ?.toString() ??
-                                'Unknown Product',
+                                '',
                           ),
-                          subtitle: Text(
+                          subtitle:
+                          Text(
                             '${item['unit'] ?? ''}'
                                 '${item['item_category'] != null ? ' • ${item['item_category']}' : ''}',
                           ),
-                          onTap: () {
+                          onTap:
+                              () {
                             Navigator.pop(
                               context,
                               item,
@@ -353,15 +559,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Future<void> _pickImages() async {
     if (_selectedImages.length >= 5) {
       _showMessage(
-        'Maximum 5 images allowed',
+        'Maximum 5 images allowed.',
       );
 
       return;
     }
 
     final images =
-    await _imagePicker.pickMultiImage(
-      imageQuality: 80,
+    await _imagePicker
+        .pickMultiImage(
+      imageQuality:
+      80,
     );
 
     if (images.isEmpty) {
@@ -369,7 +577,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
 
     final remaining =
-        5 - _selectedImages.length;
+        5 -
+            _selectedImages.length;
 
     final files =
     images
@@ -389,7 +598,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
 
     setState(() {
-      _selectedImages.addAll(
+      _selectedImages
+          .addAll(
         files,
       );
     });
@@ -399,7 +609,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
       int index,
       ) {
     setState(() {
-      _selectedImages.removeAt(
+      _selectedImages
+          .removeAt(
         index,
       );
     });
@@ -414,6 +625,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     final category =
     _categoryController.text.trim();
+
+    final price =
+    double.tryParse(
+      _priceController.text.trim(),
+    );
 
     if (productName.isEmpty) {
       _showMessage(
@@ -447,11 +663,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return;
     }
 
-    final price =
-    double.tryParse(
-      _priceController.text.trim(),
-    );
-
     if (price == null ||
         price <= 0) {
       _showMessage(
@@ -461,16 +672,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return;
     }
 
-    if (price > 99999.99) {
-      _showMessage(
-        'Price cannot exceed RM 99,999.99.',
-      );
-
-      return;
-    }
-
     setState(() {
-      _isSaving = true;
+      _isSaving =
+      true;
     });
 
     try {
@@ -491,31 +695,37 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       if (duplicate != null) {
         final productId =
-        duplicate['id'] is int
-            ? duplicate['id'] as int
-            : int.parse(
-          duplicate['id']
-              .toString(),
+        _toInt(
+          duplicate['id'],
         );
+
+        if (productId == null) {
+          throw Exception(
+            'Invalid existing product.',
+          );
+        }
+
+        final currentPrice =
+            (duplicate['price']
+            as num?)
+                ?.toDouble() ??
+                0;
 
         final isDeleted =
             duplicate['is_deleted'] ==
                 true;
 
-        final continueUpdate =
+        final update =
         await _showDuplicateDialog(
           isDeleted:
           isDeleted,
           currentPrice:
-          (duplicate['price']
-          as num?)
-              ?.toDouble() ??
-              0,
+          currentPrice,
           newPrice:
           price,
         );
 
-        if (!continueUpdate) {
+        if (!update) {
           return;
         }
 
@@ -542,7 +752,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
         _showMessage(
           isDeleted
-              ? 'Existing product restored and updated.'
+              ? 'Product restored and updated successfully.'
               : 'Existing product updated successfully.',
           success:
           true,
@@ -550,7 +760,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
         _resetForm();
 
-        widget.onProductAdded?.call();
+        widget.onProductAdded
+            ?.call();
 
         return;
       }
@@ -578,15 +789,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       _showMessage(
         _productMatched
-            ? 'Product added and linked to PriceCatcher.'
-            : 'Product added successfully.',
+            ? 'Product added and linked with PriceCatcher.'
+            : 'Custom product added successfully.',
         success:
         true,
       );
 
       _resetForm();
 
-      widget.onProductAdded?.call();
+      widget.onProductAdded
+          ?.call();
     } catch (e) {
       if (!mounted) {
         return;
@@ -598,7 +810,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _isSaving = false;
+          _isSaving =
+          false;
         });
       }
     }
@@ -611,60 +824,45 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }) async {
     final result =
     await showDialog<bool>(
-      context: context,
-      builder: (context) {
+      context:
+      context,
+      builder:
+          (context) {
         return AlertDialog(
-          title: Row(
-            children: [
-              Icon(
-                isDeleted
-                    ? Icons
-                    .restore_outlined
-                    : Icons
-                    .warning_amber_rounded,
-                color:
-                const Color(
-                  0xFFE0A327,
-                ),
-              ),
-              const SizedBox(
-                width: 10,
-              ),
-              Expanded(
-                child: Text(
-                  isDeleted
-                      ? 'Product Already Exists'
-                      : 'Duplicate Product',
-                ),
-              ),
-            ],
-          ),
-          content: Text(
+          title:
+          Text(
             isDeleted
-                ? 'This product already exists in your deleted products.\n\nPrevious price: RM ${currentPrice.toStringAsFixed(2)}\nNew price: RM ${newPrice.toStringAsFixed(2)}\n\nRestore it and update the price instead?'
-                : 'You already added this product.\n\nCurrent price: RM ${currentPrice.toStringAsFixed(2)}\nNew price: RM ${newPrice.toStringAsFixed(2)}\n\nWould you like to update the existing product instead?',
+                ? 'Product Already Exists'
+                : 'Duplicate Product',
+          ),
+          content:
+          Text(
+            isDeleted
+                ? 'This product is in Deleted Products.\n\nPrevious price: RM ${currentPrice.toStringAsFixed(2)}\nNew price: RM ${newPrice.toStringAsFixed(2)}\n\nRestore and update it?'
+                : 'You already added this product.\n\nCurrent price: RM ${currentPrice.toStringAsFixed(2)}\nNew price: RM ${newPrice.toStringAsFixed(2)}\n\nUpdate the existing product?',
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(
-                  context,
-                  false,
-                );
-              },
+              onPressed:
+                  () =>
+                  Navigator.pop(
+                    context,
+                    false,
+                  ),
               child:
               const Text(
                 'CANCEL',
               ),
             ),
             FilledButton(
-              onPressed: () {
-                Navigator.pop(
-                  context,
-                  true,
-                );
-              },
-              child: Text(
+              onPressed:
+                  () =>
+                  Navigator.pop(
+                    context,
+                    true,
+                  ),
+              child:
+              Text(
                 isDeleted
                     ? 'RESTORE & UPDATE'
                     : 'UPDATE PRODUCT',
@@ -680,26 +878,40 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   void _resetForm() {
-    _productNameController.removeListener(
+    _productNameController
+        .removeListener(
       _onProductNameChanged,
     );
 
     setState(() {
-      _matchedItemCode = null;
-      _matchedItemGroup = null;
+      _matchedItemCode =
+      null;
 
-      _productChecked = false;
-      _productMatched = false;
+      _matchedItemGroup =
+      null;
+
+      _productChecked =
+      false;
+
+      _productMatched =
+      false;
+
+      _priceCatcherPrice =
+      null;
 
       _productNameController.clear();
+
       _unitController.clear();
+
       _categoryController.clear();
+
       _priceController.clear();
 
       _selectedImages.clear();
     });
 
-    _productNameController.addListener(
+    _productNameController
+        .addListener(
       _onProductNameChanged,
     );
   }
@@ -724,7 +936,268 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ? const Color(
           0xFF38BB62,
         )
-            : null,
+            : Colors.red,
+      ),
+    );
+  }
+
+  Widget _buildPriceCatcherPrice() {
+    if (!_productMatched) {
+      return const SizedBox.shrink();
+    }
+
+    if (_isLoadingPrice) {
+      return Container(
+        width:
+        double.infinity,
+        padding:
+        const EdgeInsets.all(
+          16,
+        ),
+        decoration:
+        BoxDecoration(
+          color:
+          const Color(
+            0xFFF3F7F4,
+          ),
+          borderRadius:
+          BorderRadius.circular(
+            12,
+          ),
+        ),
+        child:
+        const Row(
+          children: [
+            SizedBox(
+              width:
+              22,
+              height:
+              22,
+              child:
+              CircularProgressIndicator(
+                strokeWidth:
+                2,
+              ),
+            ),
+            SizedBox(
+              width:
+              12,
+            ),
+            Expanded(
+              child:
+              Text(
+                'Getting latest PriceCatcher price from data.gov.my...',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_priceCatcherPrice == null) {
+      return Container(
+        width:
+        double.infinity,
+        padding:
+        const EdgeInsets.all(
+          16,
+        ),
+        decoration:
+        BoxDecoration(
+          color:
+          const Color(
+            0xFFFFF7E6,
+          ),
+          borderRadius:
+          BorderRadius.circular(
+            12,
+          ),
+        ),
+        child:
+        const Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              color:
+              Color(
+                0xFFB87900,
+              ),
+            ),
+            SizedBox(
+              width:
+              10,
+            ),
+            Expanded(
+              child:
+              Text(
+                'No PriceCatcher price was found for this item at your premise in the latest available dataset.',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final price =
+        (_priceCatcherPrice!['price']
+        as num?)
+            ?.toDouble() ??
+            0;
+
+    final date =
+        _priceCatcherPrice!['date']
+            ?.toString() ??
+            '-';
+
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        16,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        const Color(
+          0xFFE8F8ED,
+        ),
+        borderRadius:
+        BorderRadius.circular(
+          12,
+        ),
+      ),
+      child:
+      Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons
+                    .verified_outlined,
+                color:
+                Color(
+                  0xFF38BB62,
+                ),
+              ),
+              SizedBox(
+                width:
+                8,
+              ),
+              Text(
+                'Latest PriceCatcher Price',
+                style:
+                TextStyle(
+                  fontWeight:
+                  FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(
+            height:
+            10,
+          ),
+          Text(
+            'RM ${price.toStringAsFixed(2)}',
+            style:
+            const TextStyle(
+              fontSize:
+              24,
+              fontWeight:
+              FontWeight.bold,
+              color:
+              Color(
+                0xFF2E9F52,
+              ),
+            ),
+          ),
+          const SizedBox(
+            height:
+            4,
+          ),
+          Text(
+            'Premise Code: ${_sellerPremiseCode ?? '-'}',
+          ),
+          Text(
+            'Price Date: $date',
+          ),
+          const SizedBox(
+            height:
+            5,
+          ),
+          const Text(
+            'Reference only. You can set your own selling price.',
+            style:
+            TextStyle(
+              color:
+              Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMatchStatus() {
+    if (!_productChecked) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        14,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        _productMatched
+            ? const Color(
+          0xFFE8F8ED,
+        )
+            : const Color(
+          0xFFFFF7E6,
+        ),
+        borderRadius:
+        BorderRadius.circular(
+          12,
+        ),
+      ),
+      child:
+      Row(
+        children: [
+          Icon(
+            _productMatched
+                ? Icons
+                .check_circle_outline
+                : Icons.info_outline,
+            color:
+            _productMatched
+                ? const Color(
+              0xFF38BB62,
+            )
+                : const Color(
+              0xFFB87900,
+            ),
+          ),
+          const SizedBox(
+            width:
+            10,
+          ),
+          Expanded(
+            child:
+            Text(
+              _productMatched
+                  ? 'Product found in the latest PriceCatcher item data. Item Code: ${_matchedItemCode ?? '-'}'
+                  : 'Product was not found in the latest PriceCatcher item data. Enter unit and category manually.',
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -749,7 +1222,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               '',
           optionsBuilder:
               (
-              TextEditingValue value,
+              value,
               ) {
             final query =
             value.text
@@ -761,7 +1234,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   Map<String, dynamic>>.empty();
             }
 
-            final start =
+            final starts =
             _items.where(
                   (item) {
                 final name =
@@ -795,14 +1268,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
             );
 
             return [
-              ...start,
+              ...starts,
               ...contains,
             ].take(
               8,
             );
           },
           onSelected:
-          _selectMatchedItem,
+              (item) {
+            _selectMatchedItem(
+              item,
+            );
+          },
           fieldViewBuilder:
               (
               context,
@@ -828,23 +1305,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   Icons
                       .shopping_bag_outlined,
                 ),
-                suffixIcon:
-                controller.text.isNotEmpty
-                    ? IconButton(
-                  onPressed:
-                      () {
-                    controller
-                        .clear();
-
-                    focusNode
-                        .requestFocus();
-                  },
-                  icon:
-                  const Icon(
-                    Icons.clear,
-                  ),
-                )
-                    : null,
                 filled:
                 true,
                 fillColor:
@@ -865,7 +1325,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               onSelected,
               options,
               ) {
-            final items =
+            final list =
             options.toList();
 
             return Align(
@@ -876,14 +1336,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 5,
                 color:
                 Colors.white,
-                borderRadius:
-                BorderRadius.circular(
-                  12,
-                ),
                 child: SizedBox(
                   width:
                   constraints.maxWidth,
-                  child: ConstrainedBox(
+                  child:
+                  ConstrainedBox(
                     constraints:
                     const BoxConstraints(
                       maxHeight:
@@ -896,14 +1353,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       shrinkWrap:
                       true,
                       itemCount:
-                      items.length,
+                      list.length,
                       separatorBuilder:
                           (
                           context,
                           index,
                           ) =>
                       const Divider(
-                        height: 1,
+                        height:
+                        1,
                       ),
                       itemBuilder:
                           (
@@ -911,27 +1369,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           index,
                           ) {
                         final item =
-                        items[index];
+                        list[index];
 
                         return ListTile(
-                          leading:
-                          const Icon(
-                            Icons.search,
-                            color:
-                            Color(
-                              0xFF38BB62,
-                            ),
-                          ),
-                          title: Text(
+                          title:
+                          Text(
                             item['item']
                                 ?.toString() ??
-                                'Unknown Product',
+                                '',
                           ),
-                          subtitle: Text(
+                          subtitle:
+                          Text(
                             '${item['unit'] ?? ''}'
                                 '${item['item_category'] != null ? ' • ${item['item_category']}' : ''}',
                           ),
-                          onTap: () {
+                          onTap:
+                              () {
                             onSelected(
                               item,
                             );
@@ -946,64 +1399,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
           },
         );
       },
-    );
-  }
-
-  Widget _buildMatchStatus() {
-    if (!_productChecked) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      width:
-      double.infinity,
-      padding:
-      const EdgeInsets.all(
-        14,
-      ),
-      decoration:
-      BoxDecoration(
-        color:
-        _productMatched
-            ? const Color(
-          0xFFE8F8ED,
-        )
-            : const Color(
-          0xFFFFF7E6,
-        ),
-        borderRadius:
-        BorderRadius.circular(
-          12,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _productMatched
-                ? Icons
-                .check_circle_outline
-                : Icons.info_outline,
-            color:
-            _productMatched
-                ? const Color(
-              0xFF38BB62,
-            )
-                : const Color(
-              0xFFB87900,
-            ),
-          ),
-          const SizedBox(
-            width: 10,
-          ),
-          Expanded(
-            child: Text(
-              _productMatched
-                  ? 'Product found in PriceCatcher. Item Code: ${_matchedItemCode ?? '-'}'
-                  : 'Product not found in PriceCatcher. Enter the unit and category manually.',
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1143,7 +1538,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     BorderRadius.circular(
                       12,
                     ),
-                    child: Image.file(
+                    child:
+                    Image.file(
                       _selectedImages[
                       index],
                       width:
@@ -1155,17 +1551,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     ),
                   ),
                   Positioned(
-                    right:
-                    5,
                     top:
-                    5,
-                    child: IconButton(
+                    4,
+                    right:
+                    4,
+                    child:
+                    IconButton(
                       onPressed:
-                          () {
-                        _removeImage(
-                          index,
-                        );
-                      },
+                          () =>
+                          _removeImage(
+                            index,
+                          ),
                       icon:
                       const Icon(
                         Icons.cancel,
@@ -1179,7 +1575,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
             },
           ),
         ),
-        if (_selectedImages.length < 5)
+        if (_selectedImages.length <
+            5)
           TextButton.icon(
             onPressed:
             _pickImages,
@@ -1205,9 +1602,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
 
     _productNameController.dispose();
+
     _unitController.dispose();
+
     _categoryController.dispose();
+
     _priceController.dispose();
+
     _productNameFocusNode.dispose();
 
     super.dispose();
@@ -1230,217 +1631,284 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ),
         backgroundColor:
         Colors.white,
+        actions: [
+          IconButton(
+            onPressed:
+            _isLoading
+                ? null
+                : _loadLatestData,
+            tooltip:
+            'Refresh latest data',
+            icon:
+            const Icon(
+              Icons.refresh,
+            ),
+          ),
+        ],
       ),
       body:
       _isLoading
           ? const Center(
         child:
-        CircularProgressIndicator(),
+        Column(
+          mainAxisAlignment:
+          MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(
+              height:
+              15,
+            ),
+            Text(
+              'Getting latest PriceCatcher data from data.gov.my...',
+            ),
+          ],
+        ),
       )
           : SafeArea(
         child:
-        SingleChildScrollView(
-          padding:
-          const EdgeInsets.all(
-            20,
-          ),
+        RefreshIndicator(
+          onRefresh:
+          _loadLatestData,
           child:
-          Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Product Images',
-                style:
-                TextStyle(
-                  fontSize:
-                  20,
-                  fontWeight:
-                  FontWeight.bold,
-                ),
-              ),
-              const SizedBox(
-                height:
-                15,
-              ),
-              _buildImages(),
-              const SizedBox(
-                height:
-                30,
-              ),
-              const Text(
-                'Product Information',
-                style:
-                TextStyle(
-                  fontSize:
-                  20,
-                  fontWeight:
-                  FontWeight.bold,
-                ),
-              ),
-              const SizedBox(
-                height:
-                15,
-              ),
-              _buildProductAutocomplete(),
-              const SizedBox(
-                height:
-                12,
-              ),
-              SizedBox(
-                width:
-                double.infinity,
-                child:
-                OutlinedButton.icon(
-                  onPressed:
-                  _isCheckingProduct
-                      ? null
-                      : _checkProduct,
-                  icon:
-                  const Icon(
-                    Icons.search,
+          SingleChildScrollView(
+            physics:
+            const AlwaysScrollableScrollPhysics(),
+            padding:
+            const EdgeInsets.all(
+              20,
+            ),
+            child:
+            Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Product Images',
+                  style:
+                  TextStyle(
+                    fontSize:
+                    20,
+                    fontWeight:
+                    FontWeight.bold,
                   ),
-                  label:
-                  Text(
+                ),
+                const SizedBox(
+                  height:
+                  15,
+                ),
+                _buildImages(),
+                const SizedBox(
+                  height:
+                  30,
+                ),
+                const Text(
+                  'Product Information',
+                  style:
+                  TextStyle(
+                    fontSize:
+                    20,
+                    fontWeight:
+                    FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(
+                  height:
+                  8,
+                ),
+                const Text(
+                  'Products are matched using the latest item data from data.gov.my.',
+                  style:
+                  TextStyle(
+                    color:
+                    Colors.grey,
+                  ),
+                ),
+                const SizedBox(
+                  height:
+                  15,
+                ),
+                _buildProductAutocomplete(),
+                const SizedBox(
+                  height:
+                  12,
+                ),
+                SizedBox(
+                  width:
+                  double.infinity,
+                  child:
+                  OutlinedButton.icon(
+                    onPressed:
                     _isCheckingProduct
-                        ? 'CHECKING...'
-                        : 'CHECK PRICECATCHER',
-                  ),
-                ),
-              ),
-              const SizedBox(
-                height:
-                14,
-              ),
-              _buildMatchStatus(),
-              const SizedBox(
-                height:
-                18,
-              ),
-              _buildTextField(
-                controller:
-                _unitController,
-                label:
-                'Unit',
-                hint:
-                'Example: 1 KG',
-                icon:
-                Icons
-                    .straighten_outlined,
-                enabled:
-                _productMatched ||
-                    _canEditManualFields,
-                readOnly:
-                _productMatched,
-              ),
-              const SizedBox(
-                height:
-                16,
-              ),
-              _buildTextField(
-                controller:
-                _categoryController,
-                label:
-                'Category',
-                hint:
-                'Example: Beverages',
-                icon:
-                Icons
-                    .category_outlined,
-                enabled:
-                _productMatched ||
-                    _canEditManualFields,
-                readOnly:
-                _productMatched,
-              ),
-              const SizedBox(
-                height:
-                20,
-              ),
-              TextField(
-                controller:
-                _priceController,
-                keyboardType:
-                const TextInputType
-                    .numberWithOptions(
-                  decimal:
-                  true,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter
-                      .allow(
-                    RegExp(
-                      r'^\d{0,5}(\.\d{0,2})?',
+                        ? null
+                        : _checkProduct,
+                    icon:
+                    _isCheckingProduct
+                        ? const SizedBox(
+                      width:
+                      18,
+                      height:
+                      18,
+                      child:
+                      CircularProgressIndicator(
+                        strokeWidth:
+                        2,
+                      ),
+                    )
+                        : const Icon(
+                      Icons.search,
                     ),
-                  ),
-                ],
-                decoration:
-                InputDecoration(
-                  labelText:
-                  'Selling Price',
-                  hintText:
-                  '0.00',
-                  prefixText:
-                  'RM ',
-                  prefixIcon:
-                  const Icon(
-                    Icons
-                        .payments_outlined,
-                  ),
-                  filled:
-                  true,
-                  fillColor:
-                  Colors.white,
-                  border:
-                  OutlineInputBorder(
-                    borderRadius:
-                    BorderRadius.circular(
-                      12,
+                    label:
+                    Text(
+                      _isCheckingProduct
+                          ? 'CHECKING...'
+                          : 'CHECK PRICECATCHER',
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(
-                height:
-                30,
-              ),
-              SizedBox(
-                width:
-                double.infinity,
-                height:
-                55,
-                child:
-                FilledButton.icon(
-                  onPressed:
-                  _isSaving
-                      ? null
-                      : _saveProduct,
-                  icon:
-                  _isSaving
-                      ? const SizedBox(
-                    width:
-                    20,
+                const SizedBox(
+                  height:
+                  14,
+                ),
+                _buildMatchStatus(),
+                if (_productMatched) ...[
+                  const SizedBox(
                     height:
-                    20,
-                    child:
-                    CircularProgressIndicator(
-                      strokeWidth:
-                      2,
-                    ),
-                  )
-                      : const Icon(
-                    Icons
-                        .add_circle_outline,
+                    14,
                   ),
+                  _buildPriceCatcherPrice(),
+                ],
+                const SizedBox(
+                  height:
+                  18,
+                ),
+                _buildTextField(
+                  controller:
+                  _unitController,
                   label:
-                  Text(
-                    _isSaving
-                        ? 'ADDING PRODUCT...'
-                        : 'ADD PRODUCT',
+                  'Unit',
+                  hint:
+                  'Example: 1 KG',
+                  icon:
+                  Icons
+                      .straighten_outlined,
+                  enabled:
+                  _productMatched ||
+                      _canEditManualFields,
+                  readOnly:
+                  _productMatched,
+                ),
+                const SizedBox(
+                  height:
+                  16,
+                ),
+                _buildTextField(
+                  controller:
+                  _categoryController,
+                  label:
+                  'Category',
+                  hint:
+                  'Example: Beverages',
+                  icon:
+                  Icons
+                      .category_outlined,
+                  enabled:
+                  _productMatched ||
+                      _canEditManualFields,
+                  readOnly:
+                  _productMatched,
+                ),
+                const SizedBox(
+                  height:
+                  18,
+                ),
+                TextField(
+                  controller:
+                  _priceController,
+                  keyboardType:
+                  const TextInputType
+                      .numberWithOptions(
+                    decimal:
+                    true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter
+                        .allow(
+                      RegExp(
+                        r'^\d{0,5}(\.\d{0,2})?',
+                      ),
+                    ),
+                  ],
+                  decoration:
+                  InputDecoration(
+                    labelText:
+                    'Your Selling Price',
+                    hintText:
+                    '0.00',
+                    prefixText:
+                    'RM ',
+                    prefixIcon:
+                    const Icon(
+                      Icons
+                          .payments_outlined,
+                    ),
+                    filled:
+                    true,
+                    fillColor:
+                    Colors.white,
+                    border:
+                    OutlineInputBorder(
+                      borderRadius:
+                      BorderRadius.circular(
+                        12,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(
+                  height:
+                  30,
+                ),
+                SizedBox(
+                  width:
+                  double.infinity,
+                  height:
+                  55,
+                  child:
+                  FilledButton.icon(
+                    onPressed:
+                    _isSaving
+                        ? null
+                        : _saveProduct,
+                    icon:
+                    _isSaving
+                        ? const SizedBox(
+                      width:
+                      20,
+                      height:
+                      20,
+                      child:
+                      CircularProgressIndicator(
+                        strokeWidth:
+                        2,
+                        color:
+                        Colors.white,
+                      ),
+                    )
+                        : const Icon(
+                      Icons
+                          .add_circle_outline,
+                    ),
+                    label:
+                    Text(
+                      _isSaving
+                          ? 'ADDING PRODUCT...'
+                          : 'ADD PRODUCT',
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
