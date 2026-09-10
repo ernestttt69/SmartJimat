@@ -33,7 +33,7 @@ class ProductService {
     final response = await _supabase
         .from('seller_products')
         .select(
-      'id, seller_id, premise_code, item_code, price, created_at, is_deleted, deleted_at',
+      'id, seller_id, premise_code, item_code, price, created_at, is_deleted, deleted_at, custom_item_name, custom_unit, custom_category',
     )
         .eq(
       'seller_id',
@@ -56,42 +56,66 @@ class ProductService {
     final List<Map<String, dynamic>> result = [];
 
     for (final product in products) {
-      final itemResponse = await _supabase
-          .from('lookup_item')
-          .select(
-        'item, unit, item_group, item_category',
-      )
-          .eq(
-        'item_code',
+      final itemCode =
+      _toInt(
         product['item_code'],
-      )
-          .maybeSingle();
+      );
 
-      final imagesResponse = await _supabase
+      Map<String, dynamic>? item;
+
+      if (itemCode != null) {
+        final itemResponse = await _supabase
+            .from('lookup_item')
+            .select(
+          'item_code, item, unit, item_group, item_category',
+        )
+            .eq(
+          'item_code',
+          itemCode,
+        )
+            .maybeSingle();
+
+        if (itemResponse != null) {
+          item =
+          Map<String, dynamic>.from(
+            itemResponse,
+          );
+        }
+      } else {
+        item = {
+          'item_code': null,
+          'item':
+          product['custom_item_name'],
+          'unit':
+          product['custom_unit'],
+          'item_group': null,
+          'item_category':
+          product['custom_category'],
+        };
+      }
+
+      final imageResponse = await _supabase
           .from('seller_product_images')
           .select(
-        'id, image_url',
+        'id, product_id, image_url, created_at',
       )
           .eq(
         'product_id',
         product['id'],
       )
           .order(
-        'id',
-        ascending: true,
+        'created_at',
+      );
+
+      final images =
+      List<Map<String, dynamic>>.from(
+        imageResponse,
       );
 
       result.add({
         ...product,
-        'lookup_item': itemResponse == null
-            ? null
-            : Map<String, dynamic>.from(
-          itemResponse,
-        ),
-        'seller_product_images':
-        List<Map<String, dynamic>>.from(
-          imagesResponse,
-        ),
+        'lookup_item': item,
+        'seller_product_images': images,
       });
     }
 
@@ -112,7 +136,7 @@ class ProductService {
     final response = await _supabase
         .from('seller_products')
         .select(
-      'id, seller_id, premise_code, item_code, price, created_at, is_deleted, deleted_at',
+      'id, seller_id, premise_code, item_code, price, created_at, is_deleted, deleted_at, custom_item_name, custom_unit, custom_category',
     )
         .eq(
       'seller_id',
@@ -135,42 +159,66 @@ class ProductService {
     final List<Map<String, dynamic>> result = [];
 
     for (final product in products) {
-      final itemResponse = await _supabase
-          .from('lookup_item')
-          .select(
-        'item, unit, item_group, item_category',
-      )
-          .eq(
-        'item_code',
+      final itemCode =
+      _toInt(
         product['item_code'],
-      )
-          .maybeSingle();
+      );
 
-      final imagesResponse = await _supabase
+      Map<String, dynamic>? item;
+
+      if (itemCode != null) {
+        final itemResponse = await _supabase
+            .from('lookup_item')
+            .select(
+          'item_code, item, unit, item_group, item_category',
+        )
+            .eq(
+          'item_code',
+          itemCode,
+        )
+            .maybeSingle();
+
+        if (itemResponse != null) {
+          item =
+          Map<String, dynamic>.from(
+            itemResponse,
+          );
+        }
+      } else {
+        item = {
+          'item_code': null,
+          'item':
+          product['custom_item_name'],
+          'unit':
+          product['custom_unit'],
+          'item_group': null,
+          'item_category':
+          product['custom_category'],
+        };
+      }
+
+      final imageResponse = await _supabase
           .from('seller_product_images')
           .select(
-        'id, image_url',
+        'id, product_id, image_url, created_at',
       )
           .eq(
         'product_id',
         product['id'],
       )
           .order(
-        'id',
-        ascending: true,
+        'created_at',
+      );
+
+      final images =
+      List<Map<String, dynamic>>.from(
+        imageResponse,
       );
 
       result.add({
         ...product,
-        'lookup_item': itemResponse == null
-            ? null
-            : Map<String, dynamic>.from(
-          itemResponse,
-        ),
-        'seller_product_images':
-        List<Map<String, dynamic>>.from(
-          imagesResponse,
-        ),
+        'lookup_item': item,
+        'seller_product_images': images,
       });
     }
 
@@ -192,7 +240,7 @@ class ProductService {
     final productResponse = await _supabase
         .from('seller_products')
         .select(
-      'id, seller_id, premise_code, item_code, price, created_at, is_deleted, deleted_at',
+      'id, seller_id, premise_code, item_code, price, created_at, is_deleted, deleted_at, custom_item_name, custom_unit, custom_category',
     )
         .eq(
       'id',
@@ -209,63 +257,106 @@ class ProductService {
       productResponse,
     );
 
-    final itemResponse = await _supabase
-        .from('lookup_item')
-        .select(
-      'item, unit, item_group, item_category',
-    )
-        .eq(
-      'item_code',
+    final itemCode =
+    _toInt(
       product['item_code'],
-    )
-        .maybeSingle();
+    );
 
-    final premiseResponse = await _supabase
-        .from('lookup_premise')
-        .select(
-      'premise, address, premise_type, state, district',
-    )
-        .eq(
-      'premise_code',
+    Map<String, dynamic>? item;
+
+    if (itemCode != null) {
+      final itemResponse = await _supabase
+          .from('lookup_item')
+          .select(
+        'item_code, item, unit, item_group, item_category',
+      )
+          .eq(
+        'item_code',
+        itemCode,
+      )
+          .maybeSingle();
+
+      if (itemResponse != null) {
+        item =
+        Map<String, dynamic>.from(
+          itemResponse,
+        );
+      }
+    } else {
+      item = {
+        'item_code': null,
+        'item':
+        product['custom_item_name'],
+        'unit':
+        product['custom_unit'],
+        'item_group': null,
+        'item_category':
+        product['custom_category'],
+      };
+    }
+
+    final premiseCode =
+    _toInt(
       product['premise_code'],
-    )
-        .maybeSingle();
+    );
 
-    final imagesResponse = await _supabase
+    Map<String, dynamic>? premise;
+
+    if (premiseCode != null) {
+      final premiseResponse =
+      await _supabase
+          .from(
+        'lookup_premise',
+      )
+          .select(
+        'premise_code, premise, address, premise_type, state, district',
+      )
+          .eq(
+        'premise_code',
+        premiseCode,
+      )
+          .maybeSingle();
+
+      if (premiseResponse != null) {
+        premise =
+        Map<String, dynamic>.from(
+          premiseResponse,
+        );
+      }
+    }
+
+    final imageResponse = await _supabase
         .from('seller_product_images')
         .select(
-      'id, image_url',
+      'id, product_id, image_url, created_at',
     )
         .eq(
       'product_id',
       productId,
     )
         .order(
-      'id',
-      ascending: true,
+      'created_at',
+    );
+
+    final images =
+    List<Map<String, dynamic>>.from(
+      imageResponse,
     );
 
     return {
       ...product,
-      'lookup_item': itemResponse == null
-          ? null
-          : Map<String, dynamic>.from(
-        itemResponse,
-      ),
-      'lookup_premise': premiseResponse == null
-          ? null
-          : Map<String, dynamic>.from(
-        premiseResponse,
-      ),
-      'seller_product_images':
-      List<Map<String, dynamic>>.from(
-        imagesResponse,
-      ),
+      'lookup_item': item,
+      'lookup_premise': premise,
+      'seller_product_images': images,
     };
   }
 
   Future<void> addProduct({
-    required int itemCode,
+    int? itemCode,
+    required String productName,
+    required String unit,
+    required String category,
+    String? itemGroup,
     required double price,
     required List<File> imageFiles,
   }) async {
@@ -278,25 +369,7 @@ class ProductService {
       );
     }
 
-    if (price <= 0) {
-      throw Exception(
-        'Price must be greater than 0',
-      );
-    }
-
-    if (price > 99999.99) {
-      throw Exception(
-        'Price cannot exceed RM 99,999.99',
-      );
-    }
-
-    if (imageFiles.length > 5) {
-      throw Exception(
-        'Maximum 5 product images allowed',
-      );
-    }
-
-    final profile = await _supabase
+    final profileResponse = await _supabase
         .from('user')
         .select(
       'premise_code',
@@ -309,59 +382,130 @@ class ProductService {
 
     final premiseCode =
     _toInt(
-      profile['premise_code'],
+      profileResponse['premise_code'],
     );
 
     if (premiseCode == null) {
       throw Exception(
-        'Seller does not have a registered premise',
+        'Seller premise code is not available.',
       );
     }
 
-    final product = await _supabase
-        .from('seller_products')
-        .upsert(
-      {
+    if (productName.trim().isEmpty) {
+      throw Exception(
+        'Product name is required.',
+      );
+    }
+
+    if (unit.trim().isEmpty) {
+      throw Exception(
+        'Product unit is required.',
+      );
+    }
+
+    if (category.trim().isEmpty) {
+      throw Exception(
+        'Product category is required.',
+      );
+    }
+
+    if (price <= 0 ||
+        price > 99999.99) {
+      throw Exception(
+        'Please enter a valid selling price.',
+      );
+    }
+
+    late Map<String, dynamic>
+    productResponse;
+
+    if (itemCode != null) {
+      final response = await _supabase
+          .from('seller_products')
+          .upsert(
+        {
+          'seller_id':
+          currentUser.id,
+          'premise_code':
+          premiseCode,
+          'item_code':
+          itemCode,
+          'price':
+          price,
+          'custom_item_name':
+          null,
+          'custom_unit':
+          null,
+          'custom_category':
+          null,
+          'is_deleted':
+          false,
+          'deleted_at':
+          null,
+        },
+        onConflict:
+        'seller_id,premise_code,item_code',
+      )
+          .select(
+        'id',
+      )
+          .single();
+
+      productResponse =
+      Map<String, dynamic>.from(
+        response,
+      );
+    } else {
+      final response = await _supabase
+          .from('seller_products')
+          .insert({
         'seller_id':
         currentUser.id,
         'premise_code':
         premiseCode,
         'item_code':
-        itemCode,
+        null,
         'price':
         price,
+        'custom_item_name':
+        productName.trim(),
+        'custom_unit':
+        unit.trim(),
+        'custom_category':
+        category.trim(),
         'is_deleted':
         false,
         'deleted_at':
         null,
-      },
-      onConflict:
-      'seller_id,premise_code,item_code',
-    )
-        .select(
-      'id',
-    )
-        .single();
+      })
+          .select(
+        'id',
+      )
+          .single();
+
+      productResponse =
+      Map<String, dynamic>.from(
+        response,
+      );
+    }
 
     final productId =
     _toInt(
-      product['id'],
+      productResponse['id'],
     );
 
     if (productId == null) {
       throw Exception(
-        'Unable to create product',
+        'Unable to create product.',
       );
     }
 
-    if (imageFiles.isEmpty) {
-      return;
+    if (imageFiles.isNotEmpty) {
+      await _uploadProductImages(
+        productId: productId,
+        imageFiles: imageFiles,
+      );
     }
-
-    await _uploadProductImages(
-      productId: productId,
-      imageFiles: imageFiles,
-    );
   }
 
   Future<void> updateProduct({
@@ -378,21 +522,18 @@ class ProductService {
       );
     }
 
-    if (price <= 0) {
+    if (price <= 0 ||
+        price > 99999.99) {
       throw Exception(
-        'Price must be greater than 0',
-      );
-    }
-
-    if (price > 99999.99) {
-      throw Exception(
-        'Price cannot exceed RM 99,999.99',
+        'Please enter a valid selling price.',
       );
     }
 
     final existingImagesResponse =
     await _supabase
-        .from('seller_product_images')
+        .from(
+      'seller_product_images',
+    )
         .select(
       'id, image_url',
     )
@@ -417,8 +558,7 @@ class ProductService {
     await _supabase
         .from('seller_products')
         .update({
-      'price':
-      price,
+      'price': price,
     })
         .eq(
       'id',
@@ -429,14 +569,14 @@ class ProductService {
       currentUser.id,
     );
 
-    if (newImageFiles.isEmpty) {
-      return;
+    if (newImageFiles.isNotEmpty) {
+      await _uploadProductImages(
+        productId:
+        productId,
+        imageFiles:
+        newImageFiles,
+      );
     }
-
-    await _uploadProductImages(
-      productId: productId,
-      imageFiles: newImageFiles,
-    );
   }
 
   Future<void> softDeleteProduct(
@@ -513,29 +653,28 @@ class ProductService {
       );
     }
 
-    final List<String> uploadedPaths = [];
-    final List<int> insertedImageIds = [];
+    final uploadedPaths =
+    <String>[];
+
+    final insertedImageIds =
+    <int>[];
 
     try {
-      for (int i = 0;
+      for (var i = 0;
       i < imageFiles.length;
       i++) {
-        final imageFile =
+        final file =
         imageFiles[i];
 
         final extension =
         _getFileExtension(
-          imageFile.path,
+          file.path,
         );
 
-        final timestamp =
-            DateTime.now()
-                .microsecondsSinceEpoch;
-
         final fileName =
-            '${timestamp}_$i.$extension';
+            '${DateTime.now().microsecondsSinceEpoch}_$i.$extension';
 
-        final filePath =
+        final storagePath =
             '${currentUser.id}/$productId/$fileName';
 
         await _supabase.storage
@@ -543,8 +682,8 @@ class ProductService {
           'product-images',
         )
             .upload(
-          filePath,
-          imageFile,
+          storagePath,
+          file,
           fileOptions:
           const FileOptions(
             upsert: false,
@@ -552,7 +691,7 @@ class ProductService {
         );
 
         uploadedPaths.add(
-          filePath,
+          storagePath,
         );
 
         final imageUrl =
@@ -561,10 +700,10 @@ class ProductService {
           'product-images',
         )
             .getPublicUrl(
-          filePath,
+          storagePath,
         );
 
-        final insertedImage =
+        final imageResponse =
         await _supabase
             .from(
           'seller_product_images',
@@ -582,7 +721,7 @@ class ProductService {
 
         final imageId =
         _toInt(
-          insertedImage['id'],
+          imageResponse['id'],
         );
 
         if (imageId != null) {
@@ -592,16 +731,17 @@ class ProductService {
         }
       }
     } catch (e) {
-      if (insertedImageIds.isNotEmpty) {
+      for (final imageId
+      in insertedImageIds) {
         try {
           await _supabase
               .from(
             'seller_product_images',
           )
               .delete()
-              .inFilter(
+              .eq(
             'id',
-            insertedImageIds,
+            imageId,
           );
         } catch (_) {}
       }
@@ -623,30 +763,28 @@ class ProductService {
   }
 
   String _getFileExtension(
-      String path,
+      String filePath,
       ) {
-    final fileName =
-        path
-            .split('/')
-            .last
-            .split('\\')
-            .last;
+    final parts =
+    filePath.split(
+      '.',
+    );
 
-    if (!fileName.contains('.')) {
+    if (parts.length < 2) {
       return 'jpg';
     }
 
     final extension =
-    fileName
-        .split('.')
-        .last
-        .toLowerCase();
+    parts.last.toLowerCase();
 
-    if (extension.isEmpty) {
-      return 'jpg';
+    if (extension == 'jpg' ||
+        extension == 'jpeg' ||
+        extension == 'png' ||
+        extension == 'webp') {
+      return extension;
     }
 
-    return extension;
+    return 'jpg';
   }
 
   int? _toInt(
