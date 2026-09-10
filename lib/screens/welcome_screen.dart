@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import 'login_screen.dart';
+import 'customer_register_screen.dart';
 import 'seller_register_screens.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -19,98 +21,130 @@ class WelcomeScreen extends StatelessWidget {
                 constraints.maxWidth > constraints.maxHeight;
 
             if (isLandscape) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 60,
-                  vertical: 24,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Image.asset(
-                            'assets/images/smartjimat_logo.png',
-                            width: 220,
-                            fit: BoxFit.contain,
-                          ),
-                          const SizedBox(height: 20),
-                          const Text(
-                            'Welcome to SmartJimat',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: darkText,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Compare prices, save money and shop smarter.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF777777),
-                            ),
-                          ),
-                        ],
-                      ),
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 60,
+                      vertical: 24,
                     ),
-                    const SizedBox(width: 50),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: double.infinity,
-                            height: 55,
-                            child: FilledButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                    const LoginScreen(),
-                                  ),
-                                );
-                              },
-                              child: const Text(
-                                'LOGIN',
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment:
+                            MainAxisAlignment.center,
+                            children: [
+                              Image.asset(
+                                'assets/images/smartjimat_logo.png',
+                                width: 220,
+                                fit: BoxFit.contain,
+                              ),
+                              const SizedBox(height: 20),
+                              const Text(
+                                'Welcome to SmartJimat',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: darkText,
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 55,
-                            child: OutlinedButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                    const SellerRegisterScreen(),
-                                  ),
-                                );
-                              },
-                              child: const Text(
-                                'REGISTER AS SELLER',
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Compare prices, save money and shop smarter.',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  color: Color(0xFF777777),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 50),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment:
+                            MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                height: 55,
+                                child: FilledButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                        const LoginScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text(
+                                    'LOGIN',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 55,
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                        const UserRegisterScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text(
+                                    'REGISTER AS USER',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 55,
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                        const SellerRegisterScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text(
+                                    'REGISTER AS SELLER',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               );
             }
@@ -168,6 +202,29 @@ class WelcomeScreen extends StatelessWidget {
                           },
                           child: const Text(
                             'LOGIN',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                const UserRegisterScreen(),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'REGISTER AS USER',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,

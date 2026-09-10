@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'package:flutter/services.dart';
 import '../services/product_service.dart';
 
 class AddProductScreen extends StatefulWidget {
@@ -543,34 +543,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 height: 20,
               ),
               TextField(
-                controller:
-                _priceController,
+                controller: _priceController,
                 keyboardType:
-                const TextInputType
-                    .numberWithOptions(
+                const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                decoration:
-                InputDecoration(
-                  labelText:
-                  'Selling Price',
-                  hintText:
-                  '0.00',
-                  prefixText:
-                  'RM ',
-                  prefixIcon:
-                  const Icon(
-                    Icons
-                        .payments_outlined,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(
+                    RegExp(
+                      r'^\d{0,5}(\.\d{0,2})?',
+                    ),
+                  ),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Selling Price',
+                  hintText: '0.00',
+                  prefixText: 'RM ',
+                  prefixIcon: const Icon(
+                    Icons.payments_outlined,
                   ),
                   filled: true,
-                  fillColor:
-                  Colors.white,
-                  border:
-                  OutlineInputBorder(
-                    borderRadius:
-                    BorderRadius
-                        .circular(
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(
                       12,
                     ),
                   ),

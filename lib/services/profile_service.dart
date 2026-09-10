@@ -42,15 +42,17 @@ class ProfileService {
     };
   }
 
-  Future<void> updateSellerProfile({
+  Future<void> updateSellerAccountInfo({
     required String fullName,
     required String phone,
-    required int premiseCode,
   }) async {
-    final currentUser = _supabase.auth.currentUser;
+    final currentUser =
+        _supabase.auth.currentUser;
 
     if (currentUser == null) {
-      throw Exception('User is not logged in');
+      throw Exception(
+        'User is not logged in',
+      );
     }
 
     await _supabase
@@ -58,8 +60,10 @@ class ProfileService {
         .update({
       'full_name': fullName,
       'phone': phone,
-      'premise_code': premiseCode,
     })
-        .eq('id', currentUser.id);
+        .eq(
+      'id',
+      currentUser.id,
+    );
   }
 }

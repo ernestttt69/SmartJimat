@@ -1,177 +1,66 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'login_screen.dart';
 
-class SellerRegisterScreen extends StatefulWidget {
-  const SellerRegisterScreen({super.key});
+class UserRegisterScreen extends StatefulWidget {
+  const UserRegisterScreen({super.key});
 
   @override
-  State<SellerRegisterScreen> createState() =>
-      _SellerRegisterScreenState();
+  State<UserRegisterScreen> createState() =>
+      _UserRegisterScreenState();
 }
 
-class _SellerRegisterScreenState
-    extends State<SellerRegisterScreen> {
+class _UserRegisterScreenState
+    extends State<UserRegisterScreen> {
+  final SupabaseClient _supabase =
+      Supabase.instance.client;
+
   final _formKey = GlobalKey<FormState>();
 
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _premiseCodeController = TextEditingController();
-  final _shopNameController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final TextEditingController _fullNameController =
+  TextEditingController();
 
-  bool _isRegistering = false;
+  final TextEditingController _emailController =
+  TextEditingController();
+
+  final TextEditingController _phoneController =
+  TextEditingController();
+
+  final TextEditingController _passwordController =
+  TextEditingController();
+
+  final TextEditingController _confirmPasswordController =
+  TextEditingController();
+
+  bool _isLoading = false;
   bool _hidePassword = true;
   bool _hideConfirmPassword = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadDraft();
-  }
-
-  Future<void> _loadDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    _nameController.text =
-        prefs.getString('seller_name') ?? '';
-
-    _emailController.text =
-        prefs.getString('seller_email') ?? '';
-
-    _phoneController.text =
-        prefs.getString('seller_phone') ?? '';
-
-    _premiseCodeController.text =
-        prefs.getString('seller_premise_code') ?? '';
-
-    _shopNameController.text =
-        prefs.getString('seller_shop_name') ?? '';
-
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _saveDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setString(
-      'seller_name',
-      _nameController.text,
-    );
-
-    await prefs.setString(
-      'seller_email',
-      _emailController.text,
-    );
-
-    await prefs.setString(
-      'seller_phone',
-      _phoneController.text,
-    );
-
-    await prefs.setString(
-      'seller_premise_code',
-      _premiseCodeController.text,
-    );
-
-    await prefs.setString(
-      'seller_shop_name',
-      _shopNameController.text,
-    );
-  }
-
-  Future<Map<String, dynamic>?> _validatePremise() async {
-    final premiseCode =
-    int.tryParse(_premiseCodeController.text.trim());
-
-    final shopName =
-    _shopNameController.text.trim();
-
-    if (premiseCode == null || shopName.isEmpty) {
-      return null;
-    }
-
-    final supabase = Supabase.instance.client;
-
-    final response = await supabase
-        .from('lookup_premise')
-        .select(
-      'premise_code, premise, address, premise_type, state, district',
-    )
-        .eq('premise_code', premiseCode)
-        .maybeSingle();
-
-    if (response == null) {
-      return null;
-    }
-
-    final databaseShopName =
-        response['premise']?.toString().trim() ?? '';
-
-    if (databaseShopName.toLowerCase() !=
-        shopName.toLowerCase()) {
-      return null;
-    }
-
-    return Map<String, dynamic>.from(response);
-  }
-
-  Future<void> _register() async {
+  Future<void> _registerUser() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
     setState(() {
-      _isRegistering = true;
+      _isLoading = true;
     });
 
     try {
-      final premise = await _validatePremise();
-
-      if (premise == null) {
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Premise code and shop name do not match our database.',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-
-        return;
-      }
-
-      final supabase = Supabase.instance.client;
-
-      final premiseCode =
-      premise['premise_code'] as int;
-
-      final authResponse =
-      await supabase.auth.signUp(
+      final response =
+      await _supabase.auth.signUp(
         email: _emailController.text.trim(),
-        password: _passwordController.text,
-        emailRedirectTo:
-        'com.example.assignment://login-callback/',
+        password: _passwordController.text.trim(),
         data: {
           'full_name':
-          _nameController.text.trim(),
+          _fullNameController.text.trim(),
           'phone':
           _phoneController.text.trim(),
-          'role': 'seller',
-          'premise_code': premiseCode,
+          'role': 'customer',
         },
       );
 
-      final user = authResponse.user;
+      final user = response.user;
 
       if (user == null) {
         throw Exception(
@@ -179,26 +68,23 @@ class _SellerRegisterScreenState
         );
       }
 
-      await supabase
+      await _supabase
           .from('user')
           .insert({
         'id': user.id,
         'full_name':
-        _nameController.text.trim(),
+        _fullNameController.text.trim(),
         'phone':
         _phoneController.text.trim(),
-        'role': 'seller',
-        'premise_code': premiseCode,
+        'role': 'customer',
       });
-
-      await _clearDraft();
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Seller account created successfully. Please log in.',
+            'Registration successful. Please log in.',
           ),
           backgroundColor: Color(0xFF38BB62),
         ),
@@ -211,48 +97,18 @@ class _SellerRegisterScreenState
         ),
             (route) => route.isFirst,
       );
-    } on AuthException catch (error) {
-      if (!mounted) return;
-
-      String message = error.message;
-
-      if (message
-          .toLowerCase()
-          .contains('security purposes')) {
-        message =
-        'Please wait a moment before trying again.';
-      } else if (message
-          .toLowerCase()
-          .contains('already registered')) {
-        message =
-        'This email is already registered.';
-      } else if (message
-          .toLowerCase()
-          .contains('invalid email')) {
-        message =
-        'Please enter a valid email address.';
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } on PostgrestException catch (error) {
+    } on AuthException catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Database error: ${error.message}',
-          ),
+          content: Text(e.message),
           backgroundColor: Colors.red,
         ),
       );
-    } catch (error) {
+    } catch (e) {
       debugPrint(
-        'SELLER REGISTER ERROR: $error',
+        'USER REGISTER ERROR: $e',
       );
 
       if (!mounted) return;
@@ -260,7 +116,7 @@ class _SellerRegisterScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Registration failed. Please try again.',
+            'Unable to register account. Please try again.',
           ),
           backgroundColor: Colors.red,
         ),
@@ -268,29 +124,17 @@ class _SellerRegisterScreenState
     } finally {
       if (mounted) {
         setState(() {
-          _isRegistering = false;
+          _isLoading = false;
         });
       }
     }
   }
 
-  Future<void> _clearDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.remove('seller_name');
-    await prefs.remove('seller_email');
-    await prefs.remove('seller_phone');
-    await prefs.remove('seller_premise_code');
-    await prefs.remove('seller_shop_name');
-  }
-
   @override
   void dispose() {
-    _nameController.dispose();
+    _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _premiseCodeController.dispose();
-    _shopNameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -301,16 +145,11 @@ class _SellerRegisterScreenState
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        title: const Text(
+          'User Registration',
+        ),
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Seller Registration',
-          style: TextStyle(
-            color: Color(0xFF333632),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
       ),
       body: SafeArea(
         child: LayoutBuilder(
@@ -339,30 +178,29 @@ class _SellerRegisterScreenState
                           .stretch,
                       children: [
                         const Icon(
-                          Icons.storefront_outlined,
+                          Icons.person_add_alt_1,
                           size: 70,
-                          color: Color(0xFF38BB62),
+                          color:
+                          Color(0xFF38BB62),
                         ),
-
-                        const SizedBox(height: 20),
-
+                        const SizedBox(
+                          height: 20,
+                        ),
                         const Text(
-                          'Create Seller Account',
+                          'Create User Account',
                           textAlign:
                           TextAlign.center,
                           style: TextStyle(
                             fontSize: 26,
                             fontWeight:
                             FontWeight.bold,
-                            color:
-                            Color(0xFF333632),
                           ),
                         ),
                         const SizedBox(
                           height: 8,
                         ),
                         const Text(
-                          'Register your shop to manage products and prices.',
+                          'Register to compare prices and shop smarter.',
                           textAlign:
                           TextAlign.center,
                           style: TextStyle(
@@ -376,9 +214,7 @@ class _SellerRegisterScreenState
                         ),
                         TextFormField(
                           controller:
-                          _nameController,
-                          onChanged:
-                              (_) => _saveDraft(),
+                          _fullNameController,
                           textInputAction:
                           TextInputAction.next,
                           decoration:
@@ -422,8 +258,6 @@ class _SellerRegisterScreenState
                         TextFormField(
                           controller:
                           _emailController,
-                          onChanged:
-                              (_) => _saveDraft(),
                           keyboardType:
                           TextInputType
                               .emailAddress,
@@ -460,16 +294,8 @@ class _SellerRegisterScreenState
                               return 'Please enter your email';
                             }
 
-                            final email =
-                            value.trim();
-
-                            final emailRegex =
-                            RegExp(
-                              r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                            );
-
-                            if (!emailRegex
-                                .hasMatch(email)) {
+                            if (!value
+                                .contains('@')) {
                               return 'Please enter a valid email';
                             }
 
@@ -482,25 +308,14 @@ class _SellerRegisterScreenState
                         TextFormField(
                           controller:
                           _phoneController,
-                          onChanged:
-                              (_) => _saveDraft(),
                           keyboardType:
                           TextInputType.phone,
                           textInputAction:
                           TextInputAction.next,
-                          inputFormatters: [
-                            FilteringTextInputFormatter
-                                .digitsOnly,
-                            LengthLimitingTextInputFormatter(
-                              11,
-                            ),
-                          ],
                           decoration:
                           InputDecoration(
                             labelText:
                             'Phone Number',
-                            hintText:
-                            'Example: 0123456789',
                             prefixIcon:
                             const Icon(
                               Icons
@@ -529,126 +344,6 @@ class _SellerRegisterScreenState
                               return 'Please enter your phone number';
                             }
 
-                            final phone =
-                            value.trim();
-
-                            final phoneRegex =
-                            RegExp(
-                              r'^01[0-9]{8,9}$',
-                            );
-
-                            if (!phoneRegex
-                                .hasMatch(phone)) {
-                              return 'Please enter a valid Malaysian phone number';
-                            }
-
-                            return null;
-                          },
-                        ),
-                        const SizedBox(
-                          height: 16,
-                        ),
-                        TextFormField(
-                          controller:
-                          _premiseCodeController,
-                          onChanged:
-                              (_) => _saveDraft(),
-                          keyboardType:
-                          TextInputType.number,
-                          textInputAction:
-                          TextInputAction.next,
-                          inputFormatters: [
-                            FilteringTextInputFormatter
-                                .digitsOnly,
-                          ],
-                          decoration:
-                          InputDecoration(
-                            labelText:
-                            'Premise Code',
-                            hintText:
-                            'Enter registered premise code',
-                            prefixIcon:
-                            const Icon(
-                              Icons
-                                  .pin_outlined,
-                            ),
-                            filled: true,
-                            fillColor:
-                            const Color(
-                              0xFFF7F7F7,
-                            ),
-                            border:
-                            OutlineInputBorder(
-                              borderRadius:
-                              BorderRadius
-                                  .circular(
-                                12,
-                              ),
-                            ),
-                          ),
-                          validator:
-                              (value) {
-                            if (value == null ||
-                                value
-                                    .trim()
-                                    .isEmpty) {
-                              return 'Please enter your premise code';
-                            }
-
-                            if (int.tryParse(
-                              value.trim(),
-                            ) ==
-                                null) {
-                              return 'Premise code must contain numbers only';
-                            }
-
-                            return null;
-                          },
-                        ),
-                        const SizedBox(
-                          height: 16,
-                        ),
-                        TextFormField(
-                          controller:
-                          _shopNameController,
-                          onChanged:
-                              (_) => _saveDraft(),
-                          textInputAction:
-                          TextInputAction.next,
-                          decoration:
-                          InputDecoration(
-                            labelText:
-                            'Shop Name',
-                            hintText:
-                            'Enter shop name exactly as registered',
-                            prefixIcon:
-                            const Icon(
-                              Icons
-                                  .store_outlined,
-                            ),
-                            filled: true,
-                            fillColor:
-                            const Color(
-                              0xFFF7F7F7,
-                            ),
-                            border:
-                            OutlineInputBorder(
-                              borderRadius:
-                              BorderRadius
-                                  .circular(
-                                12,
-                              ),
-                            ),
-                          ),
-                          validator:
-                              (value) {
-                            if (value == null ||
-                                value
-                                    .trim()
-                                    .isEmpty) {
-                              return 'Please enter your shop name';
-                            }
-
                             return null;
                           },
                         ),
@@ -666,7 +361,6 @@ class _SellerRegisterScreenState
                           InputDecoration(
                             labelText:
                             'Password',
-                            errorMaxLines: 6,
                             prefixIcon:
                             const Icon(
                               Icons
@@ -706,45 +400,11 @@ class _SellerRegisterScreenState
                               (value) {
                             if (value == null ||
                                 value.isEmpty) {
-                              return 'Password requirements:\n'
-                                  '• At least 8 characters\n'
-                                  '• At least 1 uppercase letter\n'
-                                  '• At least 1 lowercase letter\n'
-                                  '• At least 1 number\n'
-                                  '• At least 1 special character';
+                              return 'Please enter a password';
                             }
 
-                            final hasMinLength =
-                                value.length >= 8;
-
-                            final hasUppercase =
-                            RegExp(r'[A-Z]')
-                                .hasMatch(value);
-
-                            final hasLowercase =
-                            RegExp(r'[a-z]')
-                                .hasMatch(value);
-
-                            final hasNumber =
-                            RegExp(r'[0-9]')
-                                .hasMatch(value);
-
-                            final hasSpecialCharacter =
-                            RegExp(
-                              r'[!@#$%^&*(),.?":{}|<>]',
-                            ).hasMatch(value);
-
-                            if (!hasMinLength ||
-                                !hasUppercase ||
-                                !hasLowercase ||
-                                !hasNumber ||
-                                !hasSpecialCharacter) {
-                              return 'Password requirements:\n'
-                                  '• At least 8 characters\n'
-                                  '• At least 1 uppercase letter\n'
-                                  '• At least 1 lowercase letter\n'
-                                  '• At least 1 number\n'
-                                  '• At least 1 special character';
+                            if (value.length < 6) {
+                              return 'Password must be at least 6 characters';
                             }
 
                             return null;
@@ -816,8 +476,8 @@ class _SellerRegisterScreenState
                           },
                           onFieldSubmitted:
                               (_) {
-                            if (!_isRegistering) {
-                              _register();
+                            if (!_isLoading) {
+                              _registerUser();
                             }
                           },
                         ),
@@ -829,11 +489,27 @@ class _SellerRegisterScreenState
                           child:
                           FilledButton(
                             onPressed:
-                            _isRegistering
+                            _isLoading
                                 ? null
-                                : _register,
+                                : _registerUser,
+                            style:
+                            FilledButton
+                                .styleFrom(
+                              backgroundColor:
+                              const Color(
+                                0xFF38BB62,
+                              ),
+                              shape:
+                              RoundedRectangleBorder(
+                                borderRadius:
+                                BorderRadius
+                                    .circular(
+                                  12,
+                                ),
+                              ),
+                            ),
                             child:
-                            _isRegistering
+                            _isLoading
                                 ? const SizedBox(
                               width:
                               22,
@@ -848,13 +524,14 @@ class _SellerRegisterScreenState
                               ),
                             )
                                 : const Text(
-                              'REGISTER AS SELLER',
+                              'REGISTER AS USER',
                               style:
                               TextStyle(
                                 fontSize:
                                 16,
                                 fontWeight:
-                                FontWeight.w600,
+                                FontWeight
+                                    .w600,
                               ),
                             ),
                           ),
@@ -864,10 +541,11 @@ class _SellerRegisterScreenState
                         ),
                         TextButton(
                           onPressed:
-                          _isRegistering
+                          _isLoading
                               ? null
                               : () {
-                            Navigator.pushReplacement(
+                            Navigator
+                                .pushReplacement(
                               context,
                               MaterialPageRoute(
                                 builder:
@@ -879,7 +557,18 @@ class _SellerRegisterScreenState
                           child:
                           const Text(
                             'Already have an account? Login',
+                            style: TextStyle(
+                              color:
+                              Color(
+                                0xFF38BB62,
+                              ),
+                              fontSize:
+                              13,
+                            ),
                           ),
+                        ),
+                        const SizedBox(
+                          height: 20,
                         ),
                       ],
                     ),
