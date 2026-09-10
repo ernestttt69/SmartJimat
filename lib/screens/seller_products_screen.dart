@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/local_database_service.dart';
 import '../services/product_service.dart';
 import 'product_detail_screen.dart';
 
-class SellerProductsScreen extends StatefulWidget {
-  const SellerProductsScreen({super.key});
+class SellerProductsScreen
+    extends StatefulWidget {
+  const SellerProductsScreen({
+    super.key,
+  });
 
   @override
-  State<SellerProductsScreen> createState() =>
+  State<SellerProductsScreen>
+  createState() =>
       SellerProductsScreenState();
 }
 
@@ -16,7 +22,8 @@ class SellerProductsScreenState
   final ProductService _productService =
   ProductService();
 
-  List<Map<String, dynamic>> _products = [];
+  List<Map<String, dynamic>> _products =
+  [];
 
   bool _isLoading = true;
 
@@ -27,84 +34,245 @@ class SellerProductsScreenState
   }
 
   Future<void> loadProducts() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    final currentUser =
+        Supabase.instance.client.auth
+            .currentUser;
+
+    if (currentUser == null) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+
+      return;
+    }
 
     try {
       final products =
-      await _productService.getSellerProducts();
+      await _productService
+          .getSellerProducts();
+
+      final List<Map<String, dynamic>>
+      cacheRows = [];
+
+      for (final product in products) {
+        Map<String, dynamic>? item;
+
+        if (product['lookup_item'] !=
+            null) {
+          item =
+          Map<String, dynamic>.from(
+            product['lookup_item'],
+          );
+        }
+
+        final images =
+            product[
+            'seller_product_images']
+            as List<dynamic>? ??
+                [];
+
+        String? imageUrl;
+
+        if (images.isNotEmpty) {
+          final firstImage =
+          Map<String, dynamic>.from(
+            images.first,
+          );
+
+          imageUrl =
+              firstImage['image_url']
+                  ?.toString();
+        }
+
+        cacheRows.add({
+          'id':
+          product['id'],
+          'seller_id':
+          currentUser.id,
+          'premise_code':
+          product[
+          'premise_code'],
+          'item_code':
+          product[
+          'item_code'],
+          'item_name':
+          item?['item']
+              ?.toString() ??
+              'Unknown Product',
+          'unit':
+          item?['unit']
+              ?.toString(),
+          'item_group':
+          item?['item_group']
+              ?.toString(),
+          'item_category':
+          item?['item_category']
+              ?.toString(),
+          'price':
+          (product['price']
+          as num)
+              .toDouble(),
+          'image_url':
+          imageUrl,
+          'created_at':
+          product['created_at']
+              ?.toString(),
+          'synced_at':
+          DateTime.now()
+              .toIso8601String(),
+        });
+      }
+
+      await LocalDatabaseService
+          .instance
+          .clearSellerProductCache(
+        currentUser.id,
+      );
+
+      await LocalDatabaseService
+          .instance
+          .cacheSellerProducts(
+        cacheRows,
+      );
 
       if (!mounted) return;
 
       setState(() {
-        _products = products;
-        _isLoading = false;
+        _products =
+            cacheRows;
       });
     } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
-
       debugPrint(
         'LOAD PRODUCTS ERROR: $e',
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+      final cachedProducts =
+      await LocalDatabaseService
+          .instance
+          .getCachedSellerProducts(
+        currentUser.id,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _products =
+            cachedProducts;
+      });
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
           content: Text(
-            'Unable to load products.',
+            cachedProducts.isEmpty
+                ? 'Unable to load products: $e'
+                : 'Unable to connect to Supabase. Showing saved products.',
           ),
+          backgroundColor:
+          Colors.red,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  Future<void> _openProduct(
+      Map<String, dynamic> product,
+      ) async {
+    final productId =
+    product['id'];
+
+    if (productId == null) {
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            ProductDetailScreen(
+              productId:
+              productId as int,
+            ),
+      ),
+    );
+
+    await loadProducts();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor:
-      const Color(0xFFF6F7F6),
+      const Color(
+        0xFFF7F7F7,
+      ),
       appBar: AppBar(
-        title: const Text(
+        automaticallyImplyLeading:
+        false,
+        title:
+        const Text(
           'My Products',
         ),
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor:
+        Colors.white,
+        surfaceTintColor:
+        Colors.white,
+        elevation: 0,
       ),
-      body: RefreshIndicator(
-        onRefresh: loadProducts,
-        child: _isLoading
-            ? const Center(
-          child:
-          CircularProgressIndicator(),
-        )
-            : _products.isEmpty
+      body: _isLoading
+          ? const Center(
+        child:
+        CircularProgressIndicator(),
+      )
+          : RefreshIndicator(
+        onRefresh:
+        loadProducts,
+        child:
+        _products.isEmpty
             ? ListView(
           physics:
           const AlwaysScrollableScrollPhysics(),
-          children: const [
+          children:
+          const [
             SizedBox(
-              height: 250,
+              height:
+              230,
             ),
             Icon(
-              Icons.inventory_2_outlined,
-              size: 70,
-              color: Colors.grey,
+              Icons
+                  .inventory_2_outlined,
+              size: 62,
+              color:
+              Colors.grey,
             ),
             SizedBox(
-              height: 15,
+              height:
+              18,
             ),
-            Center(
-              child: Text(
-                'No products added yet',
-                style: TextStyle(
-                  fontSize: 17,
-                  color: Colors.grey,
-                ),
+            Text(
+              'No products added yet',
+              textAlign:
+              TextAlign.center,
+              style:
+              TextStyle(
+                fontSize:
+                16,
+                color:
+                Colors.grey,
               ),
             ),
           ],
@@ -113,39 +281,57 @@ class SellerProductsScreenState
           physics:
           const AlwaysScrollableScrollPhysics(),
           padding:
-          const EdgeInsets.all(20),
+          const EdgeInsets.all(
+            16,
+          ),
           itemCount:
           _products.length,
           separatorBuilder:
-              (context, index) =>
+              (
+              context,
+              index,
+              ) =>
           const SizedBox(
-            height: 12,
+            height:
+            12,
           ),
           itemBuilder:
-              (context, index) {
+              (
+              context,
+              index,
+              ) {
             final product =
-            _products[index];
-
-            final item =
-                product['lookup_item']
-                as Map<String,
-                    dynamic>? ??
-                    {};
-
-            final images =
-                product['seller_product_images']
-                as List? ??
-                    [];
+            _products[
+            index];
 
             final imageUrl =
-            images.isNotEmpty
-                ? images[0]
-            ['image_url']
-                : null;
+            product[
+            'image_url']
+                ?.toString();
+
+            final productName =
+                product[
+                'item_name']
+                    ?.toString() ??
+                    'Unknown Product';
+
+            final unit =
+            product[
+            'unit']
+                ?.toString();
+
+            final price =
+                (product[
+                'price']
+                as num?)
+                    ?.toDouble() ??
+                    0;
 
             return Card(
-              elevation: 0,
-              color: Colors.white,
+              color:
+              Colors.white,
+              elevation:
+              1,
               shape:
               RoundedRectangleBorder(
                 borderRadius:
@@ -153,110 +339,112 @@ class SellerProductsScreenState
                   14,
                 ),
               ),
-              child: InkWell(
+              child:
+              InkWell(
                 borderRadius:
                 BorderRadius.circular(
                   14,
                 ),
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ProductDetailScreen(
-                            productId:
-                            product['id'],
-                          ),
-                    ),
+                onTap:
+                    () {
+                  _openProduct(
+                    product,
                   );
-
-                  loadProducts();
                 },
-                child: Padding(
+                child:
+                Padding(
                   padding:
                   const EdgeInsets.all(
                     12,
                   ),
-                  child: Row(
-                    children: [
+                  child:
+                  Row(
+                    children:
+                    [
                       ClipRRect(
                         borderRadius:
-                        BorderRadius
-                            .circular(
+                        BorderRadius.circular(
                           10,
                         ),
                         child:
-                        imageUrl != null
-                            ? Image.network(
-                          imageUrl,
+                        Container(
                           width:
                           85,
                           height:
                           85,
-                          fit: BoxFit
-                              .cover,
-                          errorBuilder:
-                              (
-                              context,
-                              error,
-                              stackTrace,
-                              ) {
-                            return _placeholder();
-                          },
-                        )
-                            : _placeholder(),
+                          color:
+                          const Color(
+                            0xFFF1F1F1,
+                          ),
+                          child:
+                          imageUrl != null &&
+                              imageUrl.isNotEmpty
+                              ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (
+                                context,
+                                error,
+                                stackTrace,
+                                ) {
+                              return const Icon(
+                                Icons.image_not_supported_outlined,
+                                color: Colors.grey,
+                              );
+                            },
+                          )
+                              : const Icon(
+                            Icons.inventory_2_outlined,
+                            size: 36,
+                            color: Colors.grey,
+                          ),
+                        ),
                       ),
                       const SizedBox(
-                        width: 15,
+                        width:
+                        14,
                       ),
                       Expanded(
-                        child: Column(
+                        child:
+                        Column(
                           crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
-                          children: [
+                          CrossAxisAlignment.start,
+                          children:
+                          [
                             Text(
-                              item['item']
-                                  ?.toString() ??
-                                  'Unknown Product',
+                              productName,
                               maxLines: 2,
-                              overflow:
-                              TextOverflow
-                                  .ellipsis,
-                              style:
-                              const TextStyle(
-                                fontSize:
-                                16,
-                                fontWeight:
-                                FontWeight
-                                    .bold,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Color(
+                                  0xFF333632,
+                                ),
                               ),
                             ),
-                            const SizedBox(
-                              height: 5,
-                            ),
-                            Text(
-                              item['unit']
-                                  ?.toString() ??
-                                  '',
-                              style:
-                              const TextStyle(
-                                color:
-                                Colors.grey,
+                            if (unit != null &&
+                                unit.isNotEmpty) ...[
+                              const SizedBox(
+                                height: 5,
                               ),
-                            ),
+                              Text(
+                                unit,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
                             const SizedBox(
                               height: 8,
                             ),
                             Text(
-                              'RM ${_formatPrice(product['price'])}',
-                              style:
-                              const TextStyle(
-                                fontSize:
-                                17,
-                                fontWeight:
-                                FontWeight
-                                    .bold,
+                              'RM ${price.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
                                 color: Color(
                                   0xFF38BB62,
                                 ),
@@ -266,8 +454,9 @@ class SellerProductsScreenState
                         ),
                       ),
                       const Icon(
-                        Icons
-                            .chevron_right,
+                        Icons.chevron_right,
+                        color:
+                        Colors.grey,
                       ),
                     ],
                   ),
@@ -278,25 +467,5 @@ class SellerProductsScreenState
         ),
       ),
     );
-  }
-
-  Widget _placeholder() {
-    return Container(
-      width: 85,
-      height: 85,
-      color: const Color(0xFFE8F8ED),
-      child: const Icon(
-        Icons.image_outlined,
-        size: 35,
-        color: Color(0xFF38BB62),
-      ),
-    );
-  }
-
-  String _formatPrice(dynamic price) {
-    final value =
-        double.tryParse(price.toString()) ?? 0;
-
-    return value.toStringAsFixed(2);
   }
 }

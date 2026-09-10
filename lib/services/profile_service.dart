@@ -42,6 +42,11 @@ class ProfileService {
     };
   }
 
+  Future<void> updateSellerAccountInfo({
+    required String fullName,
+    required String phone,
+  }) => updateSellerProfile(fullName: fullName, phone: phone);
+
   Future<void> updateSellerProfile({
     required String fullName,
     required String phone,

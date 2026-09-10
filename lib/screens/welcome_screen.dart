@@ -10,6 +10,7 @@ class WelcomeScreen extends StatelessWidget {
   static const Color smartJimatGreen = Color(0xFF38BB62);
   static const Color darkText = Color(0xFF333632);
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -28,7 +29,8 @@ class WelcomeScreen extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Column(
+                      child: SingleChildScrollView(
+                        child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Image.asset(
@@ -58,9 +60,11 @@ class WelcomeScreen extends StatelessWidget {
                         ],
                       ),
                     ),
+                    ),
                     const SizedBox(width: 50),
                     Expanded(
-                      child: Column(
+                      child: SingleChildScrollView(
+                        child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           SizedBox(
@@ -84,14 +88,22 @@ class WelcomeScreen extends StatelessWidget {
                               ),
                             ),
                           ),
-                          TextButton(
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 55,
+                            child: OutlinedButton(
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => const CustomerRegisterScreen(),
                               ),
                             ),
-                            child: const Text('REGISTER AS CUSTOMER'),
+                            child: const Text(
+                              'REGISTER AS CUSTOMER',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
+                            ),
                           ),
                           const SizedBox(height: 16),
                           SizedBox(
@@ -118,6 +130,7 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+                    ),
                     ),
                   ],
                 ),
@@ -181,14 +194,22 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                      TextButton(
+                      const SizedBox(height: 15),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: OutlinedButton(
                         onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => const CustomerRegisterScreen(),
                           ),
                         ),
-                        child: const Text('REGISTER AS CUSTOMER'),
+                        child: const Text(
+                          'REGISTER AS CUSTOMER',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        ),
                       ),
                       const SizedBox(height: 15),
                       SizedBox(

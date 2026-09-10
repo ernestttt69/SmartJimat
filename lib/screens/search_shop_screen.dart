@@ -7,17 +7,13 @@ class SearchShopScreen extends StatefulWidget {
   const SearchShopScreen({super.key});
 
   @override
-  State<SearchShopScreen> createState() =>
-      _SearchShopScreenState();
+  State<SearchShopScreen> createState() => _SearchShopScreenState();
 }
 
-class _SearchShopScreenState
-    extends State<SearchShopScreen> {
-  final TextEditingController searchController =
-  TextEditingController();
+class _SearchShopScreenState extends State<SearchShopScreen> {
+  final TextEditingController searchController = TextEditingController();
 
-  final SupabaseClient supabase =
-      Supabase.instance.client;
+  final SupabaseClient supabase = Supabase.instance.client;
 
   bool isLoading = false;
   bool hasSearched = false;
@@ -31,8 +27,7 @@ class _SearchShopScreenState
   }
 
   Future<void> searchShops() async {
-    final keyword =
-    searchController.text.trim();
+    final keyword = searchController.text.trim();
 
     if (keyword.isEmpty) {
       setState(() {
@@ -66,8 +61,7 @@ class _SearchShopScreenState
       }
 
       setState(() {
-        shops =
-        List<Map<String, dynamic>>.from(
+        shops = List<Map<String, dynamic>>.from(
           result,
         );
 
@@ -111,15 +105,10 @@ class _SearchShopScreenState
           premiseCode: int.parse(
             shop['premise_code'].toString(),
           ),
-          premiseName:
-          shop['premise']?.toString() ?? '',
-          address:
-          shop['address']?.toString() ?? '',
-          premiseType:
-          shop['premise_type']?.toString() ??
-              '',
-          state:
-          shop['state']?.toString() ?? '',
+          premiseName: shop['premise']?.toString() ?? '',
+          address: shop['address']?.toString() ?? '',
+          premiseType: shop['premise_type']?.toString() ?? '',
+          state: shop['state']?.toString() ?? '',
         ),
       ),
     );
@@ -128,8 +117,7 @@ class _SearchShopScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-      const Color(0xFFF6F7F8),
+      backgroundColor: const Color(0xFFF6F7F8),
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
@@ -140,26 +128,26 @@ class _SearchShopScreenState
           ),
         ),
       ),
-      body: Column(
+      body: ListView(
+        padding: const EdgeInsets.only(
+          bottom: 24,
+        ),
         children: [
           Padding(
-            padding:
-            const EdgeInsets.fromLTRB(
+            padding: const EdgeInsets.fromLTRB(
               20,
               20,
               20,
               12,
             ),
             child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'Find grocery shops',
                   style: TextStyle(
                     fontSize: 28,
-                    fontWeight:
-                    FontWeight.bold,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -172,53 +160,36 @@ class _SearchShopScreenState
                 ),
                 const SizedBox(height: 24),
                 TextField(
-                  controller:
-                  searchController,
-                  textInputAction:
-                  TextInputAction.search,
+                  controller: searchController,
+                  textInputAction: TextInputAction.search,
                   onChanged: (_) {
                     setState(() {});
                   },
-                  onSubmitted: (_) =>
-                      searchShops(),
-                  decoration:
-                  InputDecoration(
-                    hintText:
-                    'Search shop name...',
-                    prefixIcon:
-                    const Icon(
+                  onSubmitted: (_) => searchShops(),
+                  decoration: InputDecoration(
+                    hintText: 'Search shop name...',
+                    prefixIcon: const Icon(
                       Icons.search,
                     ),
-                    suffixIcon:
-                    searchController
-                        .text
-                        .isNotEmpty
+                    suffixIcon: searchController.text.isNotEmpty
                         ? IconButton(
-                      onPressed:
-                      clearSearch,
-                      icon:
-                      const Icon(
+                      onPressed: clearSearch,
+                      icon: const Icon(
                         Icons.close,
                       ),
                     )
                         : null,
                     filled: true,
-                    fillColor:
-                    Colors.white,
-                    contentPadding:
-                    const EdgeInsets
-                        .symmetric(
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(
                       horizontal: 18,
                       vertical: 18,
                     ),
-                    border:
-                    OutlineInputBorder(
-                      borderRadius:
-                      BorderRadius.circular(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
                         16,
                       ),
-                      borderSide:
-                      BorderSide.none,
+                      borderSide: BorderSide.none,
                     ),
                   ),
                 ),
@@ -226,31 +197,22 @@ class _SearchShopScreenState
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed:
-                    isLoading
-                        ? null
-                        : searchShops,
+                    onPressed: isLoading ? null : searchShops,
                     icon: const Icon(
                       Icons.search,
                     ),
                     label: const Text(
                       'Search Shop',
                     ),
-                    style:
-                    FilledButton.styleFrom(
-                      backgroundColor:
-                      const Color(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(
                         0xFF38BB62,
                       ),
-                      padding:
-                      const EdgeInsets
-                          .symmetric(
+                      padding: const EdgeInsets.symmetric(
                         vertical: 15,
                       ),
-                      shape:
-                      RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
                           14,
                         ),
                       ),
@@ -260,9 +222,7 @@ class _SearchShopScreenState
               ],
             ),
           ),
-          Expanded(
-            child: buildContent(),
-          ),
+          buildContent(),
         ],
       ),
     );
@@ -270,142 +230,150 @@ class _SearchShopScreenState
 
   Widget buildContent() {
     if (isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
+      return const Padding(
+        padding: EdgeInsets.symmetric(
+          vertical: 80,
+        ),
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
       );
     }
 
     if (!hasSearched) {
-      return Center(
-        child: Padding(
-          padding:
-          const EdgeInsets.all(20),
-          child: Container(
-            width: double.infinity,
-            padding:
-            const EdgeInsets.all(30),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius:
-              BorderRadius.circular(20),
+      return Padding(
+        padding: const EdgeInsets.all(
+          20,
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(
+            30,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(
+              20,
             ),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.storefront_outlined,
-                  size: 64,
-                  color: Color(
-                    0xFF38BB62,
-                  ),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.storefront_outlined,
+                size: 64,
+                color: Color(
+                  0xFF38BB62,
                 ),
-                SizedBox(height: 16),
-                Text(
-                  'Search for shops',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight:
-                    FontWeight.bold,
-                  ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Search for shops',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
-                SizedBox(height: 8),
-                Text(
-                  'Enter a shop name above to find grocery stores.',
-                  textAlign:
-                  TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.grey,
-                  ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Enter a shop name above to find grocery stores.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.grey,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
     }
 
     if (shops.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.search_off,
-              size: 60,
-              color: Colors.grey,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'No shops found',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Try another shop name.',
-              style: TextStyle(
+      return const Padding(
+        padding: EdgeInsets.symmetric(
+          vertical: 80,
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.search_off,
+                size: 60,
                 color: Colors.grey,
               ),
-            ),
-          ],
+              SizedBox(height: 16),
+              Text(
+                'No shops found',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Try another shop name.',
+                style: TextStyle(
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return ListView.separated(
-      padding:
-      const EdgeInsets.fromLTRB(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
         20,
         8,
         20,
         24,
       ),
       itemCount: shops.length,
-      separatorBuilder: (_, __) =>
-      const SizedBox(height: 12),
+      separatorBuilder: (_, __) => const SizedBox(
+        height: 12,
+      ),
       itemBuilder: (context, index) {
         final shop = shops[index];
 
-        final premise =
-            shop['premise']?.toString() ?? '';
+        final premise = shop['premise']?.toString() ?? '';
 
-        final address =
-            shop['address']?.toString() ?? '';
+        final address = shop['address']?.toString() ?? '';
 
-        final premiseType =
-            shop['premise_type']?.toString() ??
-                '';
+        final premiseType = shop['premise_type']?.toString() ?? '';
 
-        final state =
-            shop['state']?.toString() ?? '';
+        final state = shop['state']?.toString() ?? '';
 
         return Material(
           color: Colors.white,
-          borderRadius:
-          BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(
+            18,
+          ),
           child: InkWell(
-            borderRadius:
-            BorderRadius.circular(18),
-            onTap: () => openShop(shop),
+            borderRadius: BorderRadius.circular(
+              18,
+            ),
+            onTap: () => openShop(
+              shop,
+            ),
             child: Padding(
-              padding:
-              const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(
+                18,
+              ),
               child: Row(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     width: 52,
                     height: 52,
-                    decoration:
-                    BoxDecoration(
+                    decoration: BoxDecoration(
                       color: const Color(
                         0xFFE7F8EC,
                       ),
-                      borderRadius:
-                      BorderRadius.circular(
+                      borderRadius: BorderRadius.circular(
                         14,
                       ),
                     ),
@@ -419,59 +387,48 @@ class _SearchShopScreenState
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           premise,
-                          style:
-                          const TextStyle(
+                          style: const TextStyle(
                             fontSize: 17,
-                            fontWeight:
-                            FontWeight.bold,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if (premiseType
-                            .isNotEmpty) ...[
+                        if (premiseType.isNotEmpty) ...[
                           const SizedBox(
                             height: 5,
                           ),
                           Text(
                             premiseType,
-                            style:
-                            const TextStyle(
+                            style: const TextStyle(
                               color: Color(
                                 0xFF38BB62,
                               ),
-                              fontWeight:
-                              FontWeight.w600,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
-                        if (address
-                            .isNotEmpty) ...[
+                        if (address.isNotEmpty) ...[
                           const SizedBox(
                             height: 7,
                           ),
                           Text(
                             address,
-                            style:
-                            const TextStyle(
+                            style: const TextStyle(
                               color: Colors.grey,
                               height: 1.35,
                             ),
                           ),
                         ],
-                        if (state
-                            .isNotEmpty) ...[
+                        if (state.isNotEmpty) ...[
                           const SizedBox(
                             height: 5,
                           ),
                           Text(
                             state,
-                            style:
-                            const TextStyle(
+                            style: const TextStyle(
                               color: Colors.grey,
                               fontSize: 13,
                             ),

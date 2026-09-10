@@ -55,12 +55,19 @@ class SessionService extends ChangeNotifier {
     try {
       await cart.bindUser(id);
       if (id != null) {
-        final profile = await client
+        var profile = await client
             .from('user')
             .select('role')
             .eq('id', id)
             .maybeSingle();
         if (generation != _generation) return;
+        if (profile == null) {
+          await _createMissingProfile(id, generation);
+          if (generation != _generation) return;
+          profile = await client.from('user').select('role')
+              .eq('id', id).maybeSingle();
+          if (generation != _generation) return;
+        }
         final accountRole = profile?['role'];
         if (accountRole != 'seller' && accountRole != 'customer') {
           throw StateError(
@@ -81,6 +88,52 @@ class SessionService extends ChangeNotifier {
   void finishPasswordRecovery() {
     recoveringPassword = false;
     notifyListeners();
+  }
+
+  Future<void> _createMissingProfile(String id, int generation) async {
+    final user = client.auth.currentUser;
+    if (generation != _generation || user == null || user.id != id) return;
+    final metadata = user.userMetadata ?? <String, dynamic>{};
+    final accountRole = metadata['role'];
+    final name = metadata['full_name']?.toString().trim() ?? '';
+    final phone = metadata['phone']?.toString().trim() ?? '';
+    if ((accountRole != 'customer' && accountRole != 'seller') ||
+        name.isEmpty || phone.isEmpty) {
+      throw StateError('Your account is missing registration details. Please contact support to restore your profile.');
+    }
+
+    int? premiseCode;
+    if (accountRole == 'seller') {
+      premiseCode = int.tryParse(metadata['premise_code']?.toString() ?? '');
+      if (premiseCode == null) {
+        throw StateError('Your seller account is missing its registered premise. Please contact support.');
+      }
+      final premise = await client.from('lookup_premise')
+          .select('premise_code').eq('premise_code', premiseCode).maybeSingle();
+      if (premise == null) {
+        throw StateError('Your registered premise could not be found. Please contact support.');
+      }
+    }
+    if (generation != _generation || client.auth.currentUser?.id != id) return;
+    try {
+      // Insert only: never overwrite an existing role or profile with metadata.
+      // RLS must restrict profile creation to the authenticated user's own ID.
+      await client.from('user').insert({
+        'id': id,
+        'full_name': name,
+        'phone': phone,
+        'role': accountRole,
+        if (accountRole == 'seller') 'premise_code': premiseCode,
+      });
+    } on PostgrestException catch (e) {
+      // A trigger or concurrent session load may already have created the row.
+      // The caller reads it again and validates the persisted role.
+      if (e.code == '23505') return;
+      if (e.code == '42501') {
+        throw StateError('Your account exists, but profile creation was denied. Please ask the administrator to check user-table permissions, then tap Retry.');
+      }
+      rethrow;
+    }
   }
 
   Future<void> signOut() async {

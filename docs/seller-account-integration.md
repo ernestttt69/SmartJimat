@@ -15,8 +15,18 @@ Missing profiles, unknown roles and failed cart loads show a retry/logout screen
 Auth changes discard the previous account's entire navigation stack. Token refresh
 and password reauthentication for the same user leave navigation and cart intact.
 Customer profiles reuse account editing, photo upload and password changes without
-requiring a seller premise. Customer and seller registration supply metadata to the
-existing Supabase signup trigger that creates the `user` row.
+requiring a seller premise. Customer and seller registration save profile fields
+in Auth signup metadata. On authenticated session startup, SessionService reads
+the `user` row and inserts it from that metadata if missing. This also repairs
+previously registered accounts after email confirmation and login. Existing rows
+are never overwritten. No signup trigger is assumed to exist.
+
+With email confirmation enabled and no database trigger, the `user` row is created
+on the first authenticated app session, not before the email is verified. The
+authenticated user needs SELECT/INSERT access to their own profile under RLS;
+seller accounts also need read access to their registered `lookup_premise` row.
+No database policies are changed by this code. Missing metadata or denied writes
+show an actionable error rather than admitting the account into Home.
 
 Android handles the seller module's existing `com.example.assignment://login-callback/`
 URL for signup confirmation and password recovery. That URL must be allowed in

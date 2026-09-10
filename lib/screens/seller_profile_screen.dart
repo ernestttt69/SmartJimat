@@ -1,31 +1,38 @@
-import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
-import '../services/profile_service.dart';
-import '../services/shopping_cart_service.dart';
-import 'change_password_screen.dart';
-import 'edit_profile_screen.dart';
-
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../services/profile_service.dart';
+import 'change_password_screen.dart';
+import 'seller_edit_profile_screen.dart';
+import '../services/shopping_cart_service.dart';
 
 class SellerProfileScreen extends StatefulWidget {
-  const SellerProfileScreen({super.key, this.isSeller = true});
-  final bool isSeller;
+  const SellerProfileScreen({
+    super.key,
+  });
 
   @override
-  State<SellerProfileScreen> createState() => _SellerProfileScreenState();
+  State<SellerProfileScreen> createState() =>
+      _SellerProfileScreenState();
 }
 
-class _SellerProfileScreenState extends State<SellerProfileScreen> {
-  final ProfileService _profileService = ProfileService();
-  final ImagePicker _imagePicker = ImagePicker();
+class _SellerProfileScreenState
+    extends State<SellerProfileScreen> {
+  final ProfileService _profileService =
+  ProfileService();
+
+  final ImagePicker _imagePicker =
+  ImagePicker();
 
   Map<String, dynamic>? _profile;
 
   bool _isLoading = true;
   bool _isUploadingImage = false;
+  bool _isLoggingOut = false;
+
   String? _error;
 
   @override
@@ -36,9 +43,13 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
 
   Future<void> _loadProfile() async {
     try {
-      final profile = await _profileService.getSellerProfile();
+      final profile =
+      await _profileService
+          .getSellerProfile();
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _profile = profile;
@@ -46,7 +57,9 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
         _isLoading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _error = error.toString();
@@ -57,7 +70,8 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
 
   Future<void> _pickProfileImage() async {
     try {
-      final XFile? image = await _imagePicker.pickImage(
+      final XFile? image =
+      await _imagePicker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 80,
       );
@@ -70,364 +84,744 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
         _isUploadingImage = true;
       });
 
-      final supabase = Supabase.instance.client;
-      final currentUser = supabase.auth.currentUser;
+      final supabase =
+          Supabase.instance.client;
+
+      final currentUser =
+          supabase.auth.currentUser;
 
       if (currentUser == null) {
-        throw Exception('User is not logged in');
+        throw Exception(
+          'User is not logged in',
+        );
       }
 
-      final file = File(image.path);
+      final file =
+      File(
+        image.path,
+      );
 
-      final extension = image.path.split('.').last.toLowerCase();
+      final extension =
+      image.path
+          .split('.')
+          .last
+          .toLowerCase();
 
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}.$extension';
 
-      final filePath = '${currentUser.id}/$fileName';
+      final filePath =
+          '${currentUser.id}/$fileName';
 
       await supabase.storage
-          .from('profile-images')
-          .upload(filePath, file, fileOptions: const FileOptions(upsert: true));
+          .from(
+        'profile-images',
+      )
+          .upload(
+        filePath,
+        file,
+        fileOptions:
+        const FileOptions(
+          upsert: true,
+        ),
+      );
 
-      final imageUrl = supabase.storage
-          .from('profile-images')
-          .getPublicUrl(filePath);
+      final imageUrl =
+      supabase.storage
+          .from(
+        'profile-images',
+      )
+          .getPublicUrl(
+        filePath,
+      );
 
       await supabase
-          .from('user')
-          .update({'profile_image_url': imageUrl})
-          .eq('id', currentUser.id);
+          .from(
+        'user',
+      )
+          .update({
+        'profile_image_url':
+        imageUrl,
+      })
+          .eq(
+        'id',
+        currentUser.id,
+      );
 
       await _loadProfile();
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
-          content: Text('Profile image updated successfully!'),
-          backgroundColor: Color(0xFF38BB62),
+          content: Text(
+            'Profile image updated successfully!',
+          ),
+          backgroundColor:
+          Color(
+            0xFF38BB62,
+          ),
         ),
       );
     } on StorageException catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
-          content: Text('Upload failed: ${error.message}'),
-          backgroundColor: Colors.red,
+          content: Text(
+            'Upload failed: ${error.message}',
+          ),
+          backgroundColor:
+          Colors.red,
         ),
       );
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
-          content: Text('Failed to update profile image: $error'),
-          backgroundColor: Colors.red,
+          content: Text(
+            'Failed to update profile image: $error',
+          ),
+          backgroundColor:
+          Colors.red,
         ),
       );
     } finally {
       if (mounted) {
         setState(() {
-          _isUploadingImage = false;
+          _isUploadingImage =
+          false;
         });
       }
     }
   }
 
   Future<void> _logout() async {
+    if (_isLoggingOut) {
+      return;
+    }
+
+    final confirmed =
+    await showDialog<bool>(
+      context: context,
+      builder: (
+          dialogContext,
+          ) {
+        return AlertDialog(
+          title: const Text(
+            'Logout',
+          ),
+          content: const Text(
+            'Are you sure you want to logout?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child: const Text(
+                'CANCEL',
+              ),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              style:
+              FilledButton.styleFrom(
+                backgroundColor:
+                Colors.red,
+              ),
+              child: const Text(
+                'LOGOUT',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _isLoggingOut = true;
+    });
+
     try {
       await ShoppingCartService.instance.flush();
-      await Supabase.instance.client.auth.signOut();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Logout failed: $e')));
+      await Supabase.instance.client.auth
+          .signOut();
+
+      if (!mounted) {
+        return;
       }
+
+      // AuthGate resets navigation when the session ends.
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            'Logout failed: $error',
+          ),
+          backgroundColor:
+          Colors.red,
+        ),
+      );
+
+      setState(() {
+        _isLoggingOut = false;
+      });
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context,
+      ) {
     return Scaffold(
-      backgroundColor: Colors.white,
-
+      backgroundColor:
+      Colors.white,
       appBar: AppBar(
-        title: Text(
-          widget.isSeller ? 'Seller Profile' : 'Profile',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+        automaticallyImplyLeading:
+        false,
+        title: const Text(
+          'Seller Profile',
+          style: TextStyle(
+            fontWeight:
+            FontWeight.w600,
+          ),
         ),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor:
+        Colors.white,
+        surfaceTintColor:
+        Colors.white,
       ),
-
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+        child:
+        CircularProgressIndicator(),
+      )
           : _error != null
           ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(_error!, textAlign: TextAlign.center),
+        child:
+        Padding(
+          padding:
+          const EdgeInsets.all(
+            24,
+          ),
+          child:
+          Column(
+            mainAxisSize:
+            MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons
+                    .error_outline,
+                size: 50,
+                color:
+                Colors.red,
               ),
-            )
+              const SizedBox(
+                height: 15,
+              ),
+              Text(
+                _error!,
+                textAlign:
+                TextAlign.center,
+              ),
+              const SizedBox(
+                height: 15,
+              ),
+              FilledButton(
+                onPressed:
+                    () {
+                  setState(
+                        () {
+                      _isLoading =
+                      true;
+                      _error =
+                      null;
+                    },
+                  );
+
+                  _loadProfile();
+                },
+                child:
+                const Text(
+                  'RETRY',
+                ),
+              ),
+            ],
+          ),
+        ),
+      )
           : RefreshIndicator(
-              onRefresh: _loadProfile,
-              child: ListView(
-                padding: const EdgeInsets.all(24),
-                children: [
-                  // Profile icon
-                  Center(
-                    child: GestureDetector(
-                      onTap: _isUploadingImage ? null : _pickProfileImage,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          CircleAvatar(
-                            radius: 52,
-                            backgroundColor: const Color(0xFFE4F7EA),
-
-                            backgroundImage:
-                                _profile?['profile_image_url'] != null &&
-                                    _profile!['profile_image_url']
-                                        .toString()
-                                        .isNotEmpty
-                                ? NetworkImage(
-                                    _profile!['profile_image_url'].toString(),
-                                  )
-                                : null,
-
-                            child:
-                                _profile?['profile_image_url'] == null ||
-                                    _profile!['profile_image_url']
-                                        .toString()
-                                        .isEmpty
-                                ? Icon(
-                                    widget.isSeller
-                                        ? Icons.storefront
-                                        : Icons.person,
-                                    size: 48,
-                                    color: Color(0xFF38BB62),
-                                  )
-                                : null,
-                          ),
-
-                          Positioned(
-                            right: -2,
-                            bottom: -2,
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF38BB62),
-                                shape: BoxShape.circle,
-                              ),
-                              child: _isUploadingImage
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(8),
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.camera_alt,
-                                      color: Colors.white,
-                                      size: 19,
-                                    ),
-                            ),
-                          ),
-                        ],
+        onRefresh:
+        _loadProfile,
+        child:
+        ListView(
+          physics:
+          const AlwaysScrollableScrollPhysics(),
+          padding:
+          const EdgeInsets.all(
+            24,
+          ),
+          children: [
+            Center(
+              child:
+              GestureDetector(
+                onTap:
+                _isUploadingImage
+                    ? null
+                    : _pickProfileImage,
+                child:
+                Stack(
+                  clipBehavior:
+                  Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius:
+                      52,
+                      backgroundColor:
+                      const Color(
+                        0xFFE4F7EA,
                       ),
+                      backgroundImage:
+                      _profile?['profile_image_url'] !=
+                          null &&
+                          _profile!['profile_image_url']
+                              .toString()
+                              .isNotEmpty
+                          ? NetworkImage(
+                        _profile!['profile_image_url']
+                            .toString(),
+                      )
+                          : null,
+                      child:
+                      _profile?['profile_image_url'] ==
+                          null ||
+                          _profile!['profile_image_url']
+                              .toString()
+                              .isEmpty
+                          ? const Icon(
+                        Icons.storefront,
+                        size: 48,
+                        color:
+                        Color(
+                          0xFF38BB62,
+                        ),
+                      )
+                          : null,
                     ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  const Text(
-                    'Tap the photo to change profile picture',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Color(0xFF777777)),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Text(
-                    _value('full_name'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF333632),
-                    ),
-                  ),
-
-                  const SizedBox(height: 5),
-
-                  Text(
-                    _value('email'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Color(0xFF777777)),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  _buildSectionTitle('Personal Information'),
-
-                  const SizedBox(height: 12),
-
-                  _buildInfoCard(
-                    icon: Icons.person_outline,
-                    title: 'Full Name',
-                    value: _value('full_name'),
-                  ),
-
-                  _buildInfoCard(
-                    icon: Icons.email_outlined,
-                    title: 'Email',
-                    value: _value('email'),
-                  ),
-
-                  _buildInfoCard(
-                    icon: Icons.phone_outlined,
-                    title: 'Phone Number',
-                    value: _value('phone'),
-                  ),
-
-                  _buildInfoCard(
-                    icon: Icons.badge_outlined,
-                    title: 'Role',
-                    value: _value('role'),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  if (widget.isSeller) ...[
-                    _buildSectionTitle('Premise Information'),
-
-                    const SizedBox(height: 12),
-
-                    _buildInfoCard(
-                      icon: Icons.store_outlined,
-                      title: 'Premise',
-                      value: _value('premise'),
-                    ),
-
-                    _buildInfoCard(
-                      icon: Icons.category_outlined,
-                      title: 'Premise Type',
-                      value: _value('premise_type'),
-                    ),
-
-                    _buildInfoCard(
-                      icon: Icons.location_on_outlined,
-                      title: 'Address',
-                      value: _value('address'),
-                    ),
-
-                    _buildInfoCard(
-                      icon: Icons.map_outlined,
-                      title: 'District',
-                      value: _value('district'),
-                    ),
-
-                    _buildInfoCard(
-                      icon: Icons.location_city_outlined,
-                      title: 'State',
-                      value: _value('state'),
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child:
+                      Container(
+                        width:
+                        36,
+                        height:
+                        36,
+                        decoration:
+                        const BoxDecoration(
+                          color:
+                          Color(
+                            0xFF38BB62,
+                          ),
+                          shape:
+                          BoxShape.circle,
+                        ),
+                        child:
+                        _isUploadingImage
+                            ? const Padding(
+                          padding:
+                          EdgeInsets.all(
+                            8,
+                          ),
+                          child:
+                          CircularProgressIndicator(
+                            strokeWidth:
+                            2,
+                            color:
+                            Colors.white,
+                          ),
+                        )
+                            : const Icon(
+                          Icons.camera_alt,
+                          color:
+                          Colors.white,
+                          size:
+                          19,
+                        ),
+                      ),
                     ),
                   ],
-
-                  const SizedBox(height: 30),
-
-                  SizedBox(
-                    height: 55,
-                    child: FilledButton.icon(
-                      onPressed: () async {
-                        final updated = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => EditProfileScreen(
-                              profile: _profile!,
-                              isSeller: widget.isSeller,
-                            ),
-                          ),
-                        );
-
-                        if (updated == true) {
-                          _loadProfile();
-                        }
-                      },
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text(
-                        'EDIT PROFILE',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  SizedBox(
-                    height: 55,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ChangePasswordScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.lock_outline),
-                      label: const Text(
-                        'CHANGE PASSWORD',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  SizedBox(
-                    height: 55,
-                    child: OutlinedButton.icon(
-                      onPressed: _logout,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                      ),
-                      icon: const Icon(Icons.logout),
-                      label: const Text(
-                        'LOGOUT',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-                ],
+                ),
               ),
             ),
+            const SizedBox(
+              height: 10,
+            ),
+            const Text(
+              'Tap the photo to change profile picture',
+              textAlign:
+              TextAlign.center,
+              style:
+              TextStyle(
+                fontSize:
+                12,
+                color:
+                Color(
+                  0xFF777777,
+                ),
+              ),
+            ),
+            const SizedBox(
+              height: 16,
+            ),
+            Text(
+              _value(
+                'full_name',
+              ),
+              textAlign:
+              TextAlign.center,
+              style:
+              const TextStyle(
+                fontSize:
+                24,
+                fontWeight:
+                FontWeight.bold,
+                color:
+                Color(
+                  0xFF333632,
+                ),
+              ),
+            ),
+            const SizedBox(
+              height: 5,
+            ),
+            Text(
+              _value(
+                'email',
+              ),
+              textAlign:
+              TextAlign.center,
+              style:
+              const TextStyle(
+                color:
+                Color(
+                  0xFF777777,
+                ),
+              ),
+            ),
+            const SizedBox(
+              height: 30,
+            ),
+            _buildSectionTitle(
+              'Personal Information',
+            ),
+            const SizedBox(
+              height: 12,
+            ),
+            _buildInfoCard(
+              icon:
+              Icons.person_outline,
+              title:
+              'Full Name',
+              value:
+              _value(
+                'full_name',
+              ),
+            ),
+            _buildInfoCard(
+              icon:
+              Icons.email_outlined,
+              title:
+              'Email',
+              value:
+              _value(
+                'email',
+              ),
+            ),
+            _buildInfoCard(
+              icon:
+              Icons.phone_outlined,
+              title:
+              'Phone Number',
+              value:
+              _value(
+                'phone',
+              ),
+            ),
+            _buildInfoCard(
+              icon:
+              Icons.badge_outlined,
+              title:
+              'Role',
+              value:
+              _value(
+                'role',
+              ),
+            ),
+            const SizedBox(
+              height: 25,
+            ),
+            _buildSectionTitle(
+              'Premise Information',
+            ),
+            const SizedBox(
+              height: 12,
+            ),
+            _buildInfoCard(
+              icon:
+              Icons.store_outlined,
+              title:
+              'Premise',
+              value:
+              _value(
+                'premise',
+              ),
+            ),
+            _buildInfoCard(
+              icon:
+              Icons.category_outlined,
+              title:
+              'Premise Type',
+              value:
+              _value(
+                'premise_type',
+              ),
+            ),
+            _buildInfoCard(
+              icon:
+              Icons.location_on_outlined,
+              title:
+              'Address',
+              value:
+              _value(
+                'address',
+              ),
+            ),
+            _buildInfoCard(
+              icon:
+              Icons.map_outlined,
+              title:
+              'District',
+              value:
+              _value(
+                'district',
+              ),
+            ),
+            _buildInfoCard(
+              icon:
+              Icons.location_city_outlined,
+              title:
+              'State',
+              value:
+              _value(
+                'state',
+              ),
+            ),
+            const SizedBox(
+              height: 30,
+            ),
+            SizedBox(
+              height:
+              55,
+              child:
+              FilledButton.icon(
+                onPressed:
+                    () async {
+                  final updated =
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (_) =>
+                          SellerEditProfileScreen(
+                            profile:
+                            _profile!,
+                          ),
+                    ),
+                  );
+
+                  if (updated ==
+                      true) {
+                    await _loadProfile();
+                  }
+                },
+                style:
+                FilledButton.styleFrom(
+                  backgroundColor:
+                  const Color(
+                    0xFF38BB62,
+                  ),
+                ),
+                icon:
+                const Icon(
+                  Icons.edit_outlined,
+                ),
+                label:
+                const Text(
+                  'EDIT PROFILE',
+                  style:
+                  TextStyle(
+                    fontWeight:
+                    FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(
+              height: 12,
+            ),
+            SizedBox(
+              height:
+              55,
+              child:
+              OutlinedButton.icon(
+                onPressed:
+                    () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (_) =>
+                      const ChangePasswordScreen(),
+                    ),
+                  );
+                },
+                icon:
+                const Icon(
+                  Icons.lock_outline,
+                ),
+                label:
+                const Text(
+                  'CHANGE PASSWORD',
+                  style:
+                  TextStyle(
+                    fontWeight:
+                    FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(
+              height: 12,
+            ),
+            SizedBox(
+              height:
+              55,
+              child:
+              OutlinedButton.icon(
+                onPressed:
+                _isLoggingOut
+                    ? null
+                    : _logout,
+                style:
+                OutlinedButton.styleFrom(
+                  foregroundColor:
+                  Colors.red,
+                  side:
+                  const BorderSide(
+                    color:
+                    Colors.red,
+                  ),
+                ),
+                icon:
+                _isLoggingOut
+                    ? const SizedBox(
+                  width:
+                  20,
+                  height:
+                  20,
+                  child:
+                  CircularProgressIndicator(
+                    strokeWidth:
+                    2,
+                    color:
+                    Colors.red,
+                  ),
+                )
+                    : const Icon(
+                  Icons.logout,
+                ),
+                label:
+                Text(
+                  _isLoggingOut
+                      ? 'LOGGING OUT...'
+                      : 'LOGOUT',
+                  style:
+                  const TextStyle(
+                    fontWeight:
+                    FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(
+              height: 30,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  String _value(String key) {
-    final value = _profile?[key];
+  String _value(
+      String key,
+      ) {
+    final value =
+    _profile?[key];
 
-    if (value == null || value.toString().trim().isEmpty) {
+    if (value == null ||
+        value
+            .toString()
+            .trim()
+            .isEmpty) {
       return '-';
     }
 
     return value.toString();
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(
+      String title,
+      ) {
     return Text(
       title,
-      style: const TextStyle(
+      style:
+      const TextStyle(
         fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Color(0xFF333632),
+        fontWeight:
+        FontWeight.bold,
+        color:
+        Color(
+          0xFF333632,
+        ),
       ),
     );
   }
@@ -438,40 +832,78 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
     required String value,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFDDEEE3)),
-        borderRadius: BorderRadius.circular(12),
+      margin:
+      const EdgeInsets.only(
+        bottom: 12,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding:
+      const EdgeInsets.all(
+        16,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        Colors.white,
+        border:
+        Border.all(
+          color:
+          const Color(
+            0xFFDDEEE3,
+          ),
+        ),
+        borderRadius:
+        BorderRadius.circular(
+          12,
+        ),
+      ),
+      child:
+      Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFF38BB62)),
-
-          const SizedBox(width: 14),
-
+          Icon(
+            icon,
+            color:
+            const Color(
+              0xFF38BB62,
+            ),
+          ),
+          const SizedBox(
+            width: 14,
+          ),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child:
+            Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF777777),
+                  style:
+                  const TextStyle(
+                    fontSize:
+                    12,
+                    color:
+                    Color(
+                      0xFF777777,
+                    ),
                   ),
                 ),
-
-                const SizedBox(height: 4),
-
+                const SizedBox(
+                  height: 4,
+                ),
                 Text(
                   value,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF333632),
+                  style:
+                  const TextStyle(
+                    fontSize:
+                    15,
+                    fontWeight:
+                    FontWeight.w500,
+                    color:
+                    Color(
+                      0xFF333632,
+                    ),
                   ),
                 ),
               ],

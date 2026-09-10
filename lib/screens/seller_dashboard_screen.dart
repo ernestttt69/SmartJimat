@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'seller_profile_screen.dart';
 import 'add_product_screen.dart';
+import 'seller_products_screen.dart';
+import 'delete_product_screen.dart';
+import 'change_password_screen.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
   const SellerDashboardScreen({super.key});
@@ -105,7 +108,9 @@ class _SellerDashboardScreenState
                       final added = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const AddProductScreen(),
+                          builder: (pageContext) => AddProductScreen(
+                            onProductAdded: () => Navigator.pop(pageContext, true),
+                          ),
                         ),
                       );
 
@@ -121,7 +126,9 @@ class _SellerDashboardScreenState
                     title: 'View Products',
                     subtitle: 'View all items',
                     onTap: () {
-                      // ProductListScreen later
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => const SellerProductsScreen(),
+                      ));
                     },
                   ),
 
@@ -131,7 +138,9 @@ class _SellerDashboardScreenState
                     title: 'Update Product',
                     subtitle: 'Edit product details',
                     onTap: () {
-                      // UpdateProductScreen later
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => const SellerProductsScreen(),
+                      ));
                     },
                   ),
 
@@ -141,7 +150,9 @@ class _SellerDashboardScreenState
                     title: 'Deleted Products',
                     subtitle: 'Restore products',
                     onTap: () {
-                      // Soft deleted products later
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => const DeletedProductsScreen(),
+                      ));
                     },
                   ),
                 ],
@@ -181,7 +192,9 @@ class _SellerDashboardScreenState
                 title: 'Change Password',
                 subtitle: 'Update your account password',
                 onTap: () {
-                  // ChangePasswordScreen later
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const ChangePasswordScreen(),
+                  ));
                 },
               ),
 

@@ -2,12 +2,12 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class LocalDatabaseService {
+  LocalDatabaseService._();
+
   static final LocalDatabaseService instance =
-  LocalDatabaseService._internal();
+  LocalDatabaseService._();
 
   static Database? _database;
-
-  LocalDatabaseService._internal();
 
   Future<Database> get database async {
     if (_database != null) {
@@ -19,100 +19,123 @@ class LocalDatabaseService {
   }
 
   Future<Database> _initDatabase() async {
-    final databasePath = await getDatabasesPath();
+    final databasePath =
+    await getDatabasesPath();
 
     final path = join(
       databasePath,
       'smartjimat.db',
     );
 
-    return await openDatabase(
+    return openDatabase(
       path,
-      version: 1,
-      onCreate: _createDatabase,
+      version: 2,
+      onCreate: (db, version) async {
+        await db.execute('''
+          CREATE TABLE cached_prices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_code INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            premise_code INTEGER NOT NULL,
+            premise_name TEXT NOT NULL,
+            price REAL NOT NULL,
+            date TEXT NOT NULL,
+            synced_at TEXT NOT NULL
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE cached_seller_products (
+            id INTEGER PRIMARY KEY,
+            seller_id TEXT NOT NULL,
+            premise_code INTEGER NOT NULL,
+            item_code INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            unit TEXT,
+            item_group TEXT,
+            item_category TEXT,
+            price REAL NOT NULL,
+            image_url TEXT,
+            created_at TEXT,
+            synced_at TEXT NOT NULL
+          )
+        ''');
+      },
+      onUpgrade: (
+          db,
+          oldVersion,
+          newVersion,
+          ) async {
+        if (oldVersion < 2) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS cached_seller_products (
+              id INTEGER PRIMARY KEY,
+              seller_id TEXT NOT NULL,
+              premise_code INTEGER NOT NULL,
+              item_code INTEGER NOT NULL,
+              item_name TEXT NOT NULL,
+              unit TEXT,
+              item_group TEXT,
+              item_category TEXT,
+              price REAL NOT NULL,
+              image_url TEXT,
+              created_at TEXT,
+              synced_at TEXT NOT NULL
+            )
+          ''');
+        }
+      },
     );
   }
 
-  Future<void> _createDatabase(
-      Database db,
-      int version,
-      ) async {
-    await db.execute('''
-      CREATE TABLE cached_prices (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        item_code INTEGER NOT NULL,
-        item_name TEXT NOT NULL,
-        premise_code INTEGER NOT NULL,
-        premise_name TEXT NOT NULL,
-        price REAL NOT NULL,
-        date TEXT NOT NULL,
-        synced_at TEXT NOT NULL
-      )
-    ''');
-  }
-
-  Future<void> insertPrice(
-      Map<String, dynamic> price,
-      ) async {
-    final db = await database;
-
-    await db.insert(
-      'cached_prices',
-      price,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
-  Future<void> savePrices(
-      List<Map<String, dynamic>> prices,
+  Future<void> cacheSellerProducts(
+      List<Map<String, dynamic>> products,
       ) async {
     final db = await database;
 
     final batch = db.batch();
 
-    for (final price in prices) {
+    for (final product in products) {
       batch.insert(
-        'cached_prices',
-        price,
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        'cached_seller_products',
+        product,
+        conflictAlgorithm:
+        ConflictAlgorithm.replace,
       );
     }
 
-    await batch.commit(noResult: true);
-  }
-
-  Future<List<Map<String, dynamic>>> getCachedPrices() async {
-    final db = await database;
-
-    return await db.query(
-      'cached_prices',
-      orderBy: 'price ASC',
+    await batch.commit(
+      noResult: true,
     );
   }
 
-  Future<List<Map<String, dynamic>>> getPricesByItem(
-      int itemCode,
+  Future<List<Map<String, dynamic>>>
+  getCachedSellerProducts(
+      String sellerId,
       ) async {
     final db = await database;
 
-    return await db.query(
-      'cached_prices',
-      where: 'item_code = ?',
-      whereArgs: [itemCode],
-      orderBy: 'price ASC',
+    return db.query(
+      'cached_seller_products',
+      where: 'seller_id = ?',
+      whereArgs: [
+        sellerId,
+      ],
+      orderBy: 'created_at DESC',
     );
   }
 
-  Future<void> clearCache() async {
+  Future<void> clearSellerProductCache(
+      String sellerId,
+      ) async {
     final db = await database;
 
-    await db.delete('cached_prices');
-  }
-
-  Future<void> closeDatabase() async {
-    final db = await database;
-    await db.close();
-
-    _database = null;
+    await db.delete(
+      'cached_seller_products',
+      where: 'seller_id = ?',
+      whereArgs: [
+        sellerId,
+      ],
+    );
   }
 }

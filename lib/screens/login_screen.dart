@@ -41,7 +41,6 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception('Login failed');
       }
 
-      // The app session gate restores the account cart and opens its home.
     } on AuthException catch (error) {
       if (!mounted) return;
 
@@ -108,10 +107,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 Visibility(
                   visible: !keyboardOpen,
-                  child: const Text(
+                  child: Text(
                   'Welcome Back',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 27,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF333632),
@@ -123,10 +122,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 Visibility(
                   visible: !compact,
-                  child: const Text(
+                  child: Text(
                   'Login to your SmartJimat account',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+                  style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
                   ),
                 ),
 
