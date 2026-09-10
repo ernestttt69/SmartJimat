@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
-import '../utils/translation_helper.dart';
 import 'products_screen.dart';
 
 class SubcategoryScreen extends StatefulWidget {
@@ -112,9 +111,6 @@ class _SubcategoryScreenState extends State<SubcategoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final englishGroup = TranslationHelper.translate(
-      widget.itemGroup,
-    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7F8),
@@ -122,7 +118,7 @@ class _SubcategoryScreenState extends State<SubcategoryScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         title: Text(
-          englishGroup,
+          widget.itemGroup,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
           ),
@@ -143,7 +139,7 @@ class _SubcategoryScreenState extends State<SubcategoryScreen> {
         padding: const EdgeInsets.all(20),
         children: [
           Text(
-            englishGroup,
+            widget.itemGroup,
             style: const TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.bold,
@@ -163,10 +159,6 @@ class _SubcategoryScreenState extends State<SubcategoryScreen> {
 
           ...categories.map(
                 (category) {
-              final englishCategory =
-              TranslationHelper.translate(
-                category,
-              );
 
               return Padding(
                 padding:
@@ -196,7 +188,7 @@ class _SubcategoryScreenState extends State<SubcategoryScreen> {
                       ),
                     ),
                     title: Text(
-                      englishCategory,
+                      category,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                       ),

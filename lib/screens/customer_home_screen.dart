@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
-import '../utils/translation_helper.dart';
 import 'ai_chat_screen.dart';
 import 'search_results_screen.dart';
 import 'shopping_list_screen.dart';
@@ -308,11 +307,6 @@ class _CustomerHomeState
                   final originalGroup =
                   itemGroups[index];
 
-                  final englishGroup =
-                  TranslationHelper
-                      .translate(
-                    originalGroup,
-                  );
 
                   return InkWell(
                     borderRadius:
@@ -396,7 +390,7 @@ class _CustomerHomeState
                             height: 12,
                           ),
                           Text(
-                            englishGroup,
+                            originalGroup,
                             textAlign:
                             TextAlign
                                 .center,

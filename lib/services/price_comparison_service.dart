@@ -28,6 +28,12 @@ class PriceComparisonService {
       return [];
     }
 
+    if (userLatitude == null || userLongitude == null ||
+        !userLatitude.isFinite || !userLongitude.isFinite ||
+        userLatitude.abs() > 90 || userLongitude.abs() > 180) {
+      throw StateError('Your location is unavailable. Enable location access and try again.');
+    }
+
     final stores = await _loadNearbyStores(
       cartItems,
       userLatitude: userLatitude,
@@ -235,7 +241,7 @@ class PriceComparisonService {
         rawPrice.toString(),
       );
 
-      if (price == null) {
+      if (price == null || !price.isFinite || price <= 0) {
         continue;
       }
 
@@ -342,7 +348,7 @@ class PriceComparisonService {
       );
 
       if (latitude == null ||
-          longitude == null) {
+          longitude == null || !latitude.isFinite || !longitude.isFinite) {
         continue;
       }
 
@@ -899,6 +905,12 @@ class PriceComparisonService {
           routeBFirst
           ? routeAFirst
           : routeBFirst;
+
+      // Display the stores in the same order used by the distance estimate.
+      if (routeBFirst < routeAFirst) {
+        final first = planStores.removeAt(0);
+        planStores.add(first);
+      }
     }
 
     return ShoppingPlan(
@@ -936,6 +948,7 @@ class PriceComparisonService {
     required double destinationLongitude,
   }) async {
     if (googleMapsApiKey.isEmpty ||
+        googleMapsApiKey == 'YOUR_GOOGLE_MAPS_API_KEY' ||
         googleMapsApiKey ==
             'AIzaSyCw9eR0wNRnT78Pqk6l5IR6mB3MLfu468I') {
       throw Exception(

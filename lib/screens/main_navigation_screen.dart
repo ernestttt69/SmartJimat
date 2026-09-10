@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../widgets/adaptive_navigation_scaffold.dart';
 
 import 'customer_home_screen.dart';
 import 'search_shop_screen.dart';
@@ -93,7 +94,7 @@ class _MainNavigationScreenState
           await SystemNavigator.pop();
         }
       },
-      child: Scaffold(
+      child: AdaptiveNavigationScaffold(
         body: IndexedStack(
           index: selectedIndex,
           children: [

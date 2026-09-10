@@ -1,8 +1,6 @@
-import 'dart:convert';
+﻿import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
 
 class AppLocation {
   final double latitude;
@@ -20,76 +18,43 @@ class AppLocation {
 
 class LocationService {
   Future<AppLocation> getCurrentLocation() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw Exception('Turn on device location services and try again.');
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception('Allow precise location for SmartJimat in device Settings.');
+    }
+    if (permission == LocationPermission.denied) {
+      throw Exception('Location permission is required to find nearby stores.');
+    }
+
+    // Use the device location, including an explicitly configured emulator
+    // location. IP geolocation is too imprecise for nearby-store comparisons.
+    final Position position;
     try {
-      final gpsLocation = await _getGpsLocation();
-
-      print('========== GPS LOCATION ==========');
-      print('Latitude: ${gpsLocation.latitude}');
-      print('Longitude: ${gpsLocation.longitude}');
-      print('Accuracy: ${gpsLocation.accuracy} meters');
-      print('==================================');
-
-      // Android Emulator commonly returns Google's
-      // default Mountain View test coordinate.
-      if (_looksLikeDefaultEmulatorLocation(
-        gpsLocation.latitude,
-        gpsLocation.longitude,
-      )) {
-        print(
-          'Default emulator location detected. '
-              'Trying IP location...',
-        );
-
-        return await _getIpLocation();
-      }
-
-      return gpsLocation;
-    } catch (e) {
-      print('GPS LOCATION ERROR: $e');
-      print('Trying IP location...');
-
-      return await _getIpLocation();
-    }
-  }
-
-  Future<AppLocation> _getGpsLocation() async {
-    final serviceEnabled =
-    await Geolocator.isLocationServiceEnabled();
-
-    if (!serviceEnabled) {
-      throw Exception(
-        'Location service is disabled.',
+      position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.best,
+          timeLimit: Duration(seconds: 20),
+        ),
       );
+    } on TimeoutException {
+      throw Exception('Location timed out. Move to an open area and retry. On an emulator, set its location first.');
     }
 
-    LocationPermission permission =
-    await Geolocator.checkPermission();
-
-    if (permission == LocationPermission.denied) {
-      permission =
-      await Geolocator.requestPermission();
+    if (!position.latitude.isFinite || !position.longitude.isFinite ||
+        position.latitude.abs() > 90 || position.longitude.abs() > 180) {
+      throw Exception('The device returned an invalid location. Please retry.');
     }
-
-    if (permission == LocationPermission.denied) {
-      throw Exception(
-        'Location permission was denied.',
-      );
+    if (!position.accuracy.isFinite || position.accuracy < 0 ||
+        position.accuracy > 200) {
+      throw Exception('Location is too approximate. Enable precise location, move to an open area and retry.');
     }
-
-    if (permission ==
-        LocationPermission.deniedForever) {
-      throw Exception(
-        'Location permission was permanently denied.',
-      );
-    }
-
-    final position =
-    await Geolocator.getCurrentPosition(
-      locationSettings:
-      const LocationSettings(
-        accuracy: LocationAccuracy.high,
-      ),
-    );
 
     return AppLocation(
       latitude: position.latitude,
@@ -97,86 +62,5 @@ class LocationService {
       accuracy: position.accuracy,
       source: 'GPS',
     );
-  }
-
-  Future<AppLocation> _getIpLocation() async {
-    final uri = Uri.parse(
-      'https://ipwho.is/',
-    );
-
-    final response = await http.get(uri);
-
-    if (response.statusCode != 200) {
-      throw Exception(
-        'IP location request failed: '
-            '${response.statusCode}',
-      );
-    }
-
-    final data =
-    jsonDecode(response.body)
-    as Map<String, dynamic>;
-
-    if (data['success'] == false) {
-      throw Exception(
-        data['message']?.toString() ??
-            'Unable to determine IP location.',
-      );
-    }
-
-    final latitude =
-    (data['latitude'] as num?)
-        ?.toDouble();
-
-    final longitude =
-    (data['longitude'] as num?)
-        ?.toDouble();
-
-    if (latitude == null ||
-        longitude == null) {
-      throw Exception(
-        'IP location did not return coordinates.',
-      );
-    }
-
-    print('========== IP LOCATION ==========');
-    print('Latitude: $latitude');
-    print('Longitude: $longitude');
-    print('City: ${data['city']}');
-    print('Region: ${data['region']}');
-    print('Country: ${data['country']}');
-    print('=================================');
-
-    return AppLocation(
-      latitude: latitude,
-      longitude: longitude,
-
-      // IP location is approximate.
-      // Do not pretend it is GPS accuracy.
-      accuracy: 5000,
-      source: 'IP',
-    );
-  }
-
-  bool _looksLikeDefaultEmulatorLocation(
-      double latitude,
-      double longitude,
-      ) {
-    const defaultLatitude = 37.4219983;
-    const defaultLongitude = -122.084;
-
-    const tolerance = 0.01;
-
-    final latitudeMatch =
-        (latitude - defaultLatitude).abs() <
-            tolerance;
-
-    final longitudeMatch =
-        (longitude - defaultLongitude).abs() <
-            tolerance;
-
-    return latitudeMatch &&
-        longitudeMatch &&
-        !kIsWeb;
   }
 }

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../services/shopping_cart_service.dart';
 import '../services/supabase_service.dart';
-import '../utils/translation_helper.dart';
 import 'shopping_list_screen.dart';
 
 class ProductsScreen extends StatefulWidget {
@@ -122,15 +121,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final englishGroup =
-    TranslationHelper.translate(
-      widget.itemGroup,
-    );
-
-    final englishCategory =
-    TranslationHelper.translate(
-      widget.itemCategory,
-    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7F8),
@@ -139,7 +129,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         backgroundColor: Colors.white,
 
         title: Text(
-          englishCategory,
+          widget.itemCategory,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
           ),
@@ -204,7 +194,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         padding: const EdgeInsets.all(20),
         children: [
           Text(
-            englishCategory,
+            widget.itemCategory,
             style: const TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.bold,
@@ -214,7 +204,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           const SizedBox(height: 5),
 
           Text(
-            englishGroup,
+            widget.itemGroup,
             style: const TextStyle(
               color: Color(0xFF38BB62),
               fontWeight: FontWeight.w600,

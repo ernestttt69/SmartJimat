@@ -56,10 +56,15 @@ class _RecommendationScreenState
       latitude = position.latitude;
       longitude = position.longitude;
     } catch (e) {
-      print(
-        'LOCATION UNAVAILABLE: $e',
-      );
+      if (!mounted) return;
+      setState(() {
+        errorMessage = 'Unable to get your location. ${e.toString().replaceFirst('Exception: ', '')}';
+        isLoading = false;
+      });
+      return;
     }
+
+    if (!mounted) return;
 
     try {
       final results =
@@ -237,7 +242,10 @@ class _RecommendationScreenState
           ),
           const SizedBox(height: 4),
           const Text(
-            'Plans prioritize item coverage, complete price information, price and distance.',
+            'Plans compare up to 10 nearby stores, prioritizing item records, known prices, then estimated total cost. '
+            'Value score = known item costs + RM 1.50 per estimated km. '
+            'Travel is one-way and may use straight-line estimates; the return trip is excluded. '
+            'Price records do not confirm current stock.',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey,

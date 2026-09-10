@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/adaptive_navigation_scaffold.dart';
 
 import 'seller_dashboard_screen.dart';
 import 'seller_products_screen.dart';
@@ -44,7 +45,7 @@ class _SellerHomeScreenState
       const SellerProfileScreen(),
     ];
 
-    return Scaffold(
+    return AdaptiveNavigationScaffold(
       backgroundColor: Colors.white,
       body: IndexedStack(
         index: _currentIndex,

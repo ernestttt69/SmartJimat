@@ -15,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocus = FocusNode();
 
   bool _hidePassword = true;
   bool _isLoading = false;
@@ -64,38 +65,50 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final compact = keyboardOpen ||
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: Colors.white,
       appBar: AppBar(
+        toolbarHeight: compact ? 40 : kToolbarHeight,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         elevation: 0,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.symmetric(horizontal: 24, vertical: compact ? 8 : 20),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
+                Visibility(
+                  visible: !compact,
+                  child: Center(
                   child: Image.asset(
                     'assets/images/smartjimat_logo.png',
                     width: 220,
                     height: 160,
                     fit: BoxFit.contain,
                   ),
+                  ),
                 ),
 
-                const SizedBox(height: 10),
+                SizedBox(height: compact ? 0 : 10),
 
-                const Text(
+                Visibility(
+                  visible: !keyboardOpen,
+                  child: const Text(
                   'Welcome Back',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -103,21 +116,28 @@ class _LoginScreenState extends State<LoginScreen> {
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF333632),
                   ),
+                  ),
                 ),
 
-                const SizedBox(height: 8),
+                SizedBox(height: compact ? 0 : 8),
 
-                const Text(
+                Visibility(
+                  visible: !compact,
+                  child: const Text(
                   'Login to your SmartJimat account',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+                  ),
                 ),
 
-                const SizedBox(height: 32),
+                SizedBox(height: compact ? 8 : 32),
 
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
+                  scrollPadding: const EdgeInsets.all(24),
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
@@ -135,10 +155,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   },
                 ),
 
-                const SizedBox(height: 18),
+                SizedBox(height: compact ? 12 : 18),
 
                 TextFormField(
                   controller: _passwordController,
+                  focusNode: _passwordFocus,
+                  textInputAction: TextInputAction.done,
+                  scrollPadding: const EdgeInsets.all(24),
+                  onFieldSubmitted: (_) {
+                    if (!_isLoading) _login();
+                  },
                   obscureText: _hidePassword,
                   decoration: InputDecoration(
                     labelText: 'Password',
