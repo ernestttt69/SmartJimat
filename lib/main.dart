@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'screens/main_navigation_screen.dart';
+import 'screens/auth_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -9,7 +9,7 @@ Future<void> main() async {
   await Supabase.initialize(
     url:
     'https://afggmxyqarbgqedzoxkh.supabase.co',
-    anonKey:
+    publishableKey:
     'sb_publishable_lmO5FpN7j9Jfz5oANPWRXg_3auGDfMR',
   );
 
@@ -35,7 +35,7 @@ class MyApp extends StatelessWidget {
         const Color(0xFFF6F7F8),
       ),
       home:
-      const MainNavigationScreen(),
+      const AuthGate(),
     );
   }
 }

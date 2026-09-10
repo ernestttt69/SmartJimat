@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/cart_item.dart';
+import '../models/shopping_plan.dart';
 import '../models/store_comparison.dart';
 
 class PriceComparisonService {
@@ -16,9 +17,9 @@ class PriceComparisonService {
   static const int maxRouteCandidates = 10;
 
   static const String googleMapsApiKey =
-      'AIzaSyCw9eR0wNRnT78Pqk6l5IR6mB3MLfu468I';
+      'YOUR_GOOGLE_MAPS_API_KEY';
 
-  Future<List<StoreComparison>> compareStores(
+  Future<List<ShoppingPlan>> compareShoppingPlans(
       List<CartItem> cartItems, {
         double? userLatitude,
         double? userLongitude,
@@ -27,12 +28,143 @@ class PriceComparisonService {
       return [];
     }
 
+    final stores = await _loadNearbyStores(
+      cartItems,
+      userLatitude: userLatitude,
+      userLongitude: userLongitude,
+    );
+
+    if (stores.isEmpty) {
+      return [];
+    }
+
+    final plans = <ShoppingPlan>[];
+
+    for (final store in stores) {
+      plans.add(
+        _buildSingleStorePlan(
+          store,
+          cartItems,
+        ),
+      );
+    }
+
+    for (int i = 0;
+    i < stores.length;
+    i++) {
+      for (int j = i + 1;
+      j < stores.length;
+      j++) {
+        plans.add(
+          _buildTwoStorePlan(
+            stores[i],
+            stores[j],
+            cartItems,
+          ),
+        );
+      }
+    }
+
+    plans.sort(_comparePlans);
+
+    final uniquePlans =
+    <ShoppingPlan>[];
+
+    final seen = <String>{};
+
+    for (final plan in plans) {
+      final codes = plan.stores
+          .map(
+            (entry) =>
+        entry.store.premiseCode,
+      )
+          .toList()
+        ..sort();
+
+      final key = codes.join('-');
+
+      if (seen.contains(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      uniquePlans.add(plan);
+
+      if (uniquePlans.length == 2) {
+        break;
+      }
+    }
+
+    print('======================================');
+    print('SHOPPING PLAN RANKING');
+    print('======================================');
+
+    for (int i = 0;
+    i < uniquePlans.length;
+    i++) {
+      final plan = uniquePlans[i];
+
+      print(
+        '#${i + 1} | '
+            '${plan.storeCount} STORE(S) | '
+            '${plan.coveredItemCount}/${plan.totalItemCount} COVERED | '
+            '${plan.pricedItemCount}/${plan.totalItemCount} PRICED | '
+            'RM ${plan.knownPriceTotal.toStringAsFixed(2)} | '
+            '${plan.travelDistanceKm.toStringAsFixed(2)} KM | '
+            'SCORE RM ${plan.valueScore.toStringAsFixed(2)}',
+      );
+    }
+
+    print('======================================');
+
+    return uniquePlans;
+  }
+
+  int _comparePlans(
+      ShoppingPlan a,
+      ShoppingPlan b,
+      ) {
+    final coverage =
+    b.coveredItemCount.compareTo(
+      a.coveredItemCount,
+    );
+
+    if (coverage != 0) {
+      return coverage;
+    }
+
+    final priced =
+    b.pricedItemCount.compareTo(
+      a.pricedItemCount,
+    );
+
+    if (priced != 0) {
+      return priced;
+    }
+
+    return a.valueScore.compareTo(
+      b.valueScore,
+    );
+  }
+
+  Future<List<StoreComparison>>
+  _loadNearbyStores(
+      List<CartItem> cartItems, {
+        double? userLatitude,
+        double? userLongitude,
+      }) async {
     final itemCodes = cartItems
         .map(
-          (item) => item.product.itemCode,
+          (item) =>
+      item.product.itemCode,
     )
         .toSet()
         .toList();
+
+    final cartItemMap = {
+      for (final item in cartItems)
+        item.product.itemCode: item,
+    };
 
     print('======================================');
     print('PRICE COMPARISON START');
@@ -43,187 +175,169 @@ class PriceComparisonService {
     );
     print('======================================');
 
-    final rpcResult = await supabase.rpc(
+    final rpcResult =
+    await supabase.rpc(
       'get_latest_prices',
       params: {
         'p_item_codes': itemCodes,
       },
     );
 
-    final List<dynamic> priceRows =
+    final rows =
     List<dynamic>.from(
       rpcResult as List,
     );
 
-    final Set<int> itemsWithPrice = {};
-
-    for (final row in priceRows) {
-      final itemCode = int.tryParse(
-        row['item_code'].toString(),
-      );
-
-      final price = double.tryParse(
-        row['price'].toString(),
-      );
-
-      if (itemCode != null &&
-          price != null) {
-        itemsWithPrice.add(itemCode);
-      }
-    }
-
-    if (itemsWithPrice.isEmpty) {
+    if (rows.isEmpty) {
+      print('NO PRICECATCHER RECORDS FOUND');
       return [];
     }
 
-    final Map<int, CartItem> cartItemMap = {
-      for (final cartItem in cartItems)
-        cartItem.product.itemCode:
-        cartItem,
-    };
+    final Map<int, Set<int>>
+    recordsByStore = {};
 
-    final Map<int, Map<int, _LatestPrice>>
+    final Map<int, Map<int, double>>
     pricesByStore = {};
 
-    for (final row in priceRows) {
-      final premiseCode = int.tryParse(
+    for (final row in rows) {
+      final premiseCode =
+      int.tryParse(
         row['premise_code'].toString(),
       );
 
-      final itemCode = int.tryParse(
+      final itemCode =
+      int.tryParse(
         row['item_code'].toString(),
       );
 
-      final price = double.tryParse(
-        row['price'].toString(),
+      if (premiseCode == null ||
+          itemCode == null) {
+        continue;
+      }
+
+      recordsByStore.putIfAbsent(
+        premiseCode,
+            () => <int>{},
       );
 
-      final priceDate =
-          row['price_date']?.toString() ?? '';
+      recordsByStore[premiseCode]!
+          .add(itemCode);
 
-      if (premiseCode == null ||
-          itemCode == null ||
-          price == null) {
+      final rawPrice =
+      row['price'];
+
+      if (rawPrice == null) {
+        continue;
+      }
+
+      final price =
+      double.tryParse(
+        rawPrice.toString(),
+      );
+
+      if (price == null) {
         continue;
       }
 
       pricesByStore.putIfAbsent(
         premiseCode,
-            () => {},
+            () => <int, double>{},
       );
 
-      pricesByStore[premiseCode]![itemCode] =
-          _LatestPrice(
-            price: price,
-            date: priceDate,
-          );
+      pricesByStore[premiseCode]![
+      itemCode] = price;
     }
 
-    final List<int> completeStoreCodes = [];
+    final storeCodes =
+    recordsByStore.keys.toList();
 
-    for (final entry
-    in pricesByStore.entries) {
-      final hasAllItems =
-      itemsWithPrice.every(
-            (itemCode) =>
-            entry.value.containsKey(
-              itemCode,
-            ),
-      );
-
-      if (hasAllItems) {
-        completeStoreCodes.add(
-          entry.key,
-        );
-      }
-    }
-
-    if (completeStoreCodes.isEmpty) {
+    if (storeCodes.isEmpty) {
       return [];
     }
 
-    final premiseRows = await supabase
+    final premiseRows =
+    await supabase
         .from('lookup_premise')
         .select(
-      'premise_code, '
-          'premise, '
-          'address, '
-          'premise_type, '
-          'state',
+      'premise_code, premise, address, premise_type, state',
     )
         .inFilter(
       'premise_code',
-      completeStoreCodes,
+      storeCodes,
+    );
+
+    final locationRows =
+    await supabase
+        .from('premise_location')
+        .select(
+      'premise_code, latitude, longitude',
+    )
+        .inFilter(
+      'premise_code',
+      storeCodes,
     );
 
     final Map<int, Map<String, dynamic>>
     premiseMap = {};
 
     for (final row in premiseRows) {
-      final premiseCode = int.tryParse(
+      final code =
+      int.tryParse(
         row['premise_code'].toString(),
       );
 
-      if (premiseCode != null) {
-        premiseMap[premiseCode] =
+      if (code != null) {
+        premiseMap[code] =
         Map<String, dynamic>.from(
           row,
         );
       }
     }
-
-    final locationRows = await supabase
-        .from('premise_location')
-        .select(
-      'premise_code, '
-          'latitude, '
-          'longitude',
-    )
-        .inFilter(
-      'premise_code',
-      completeStoreCodes,
-    );
 
     final Map<int, Map<String, dynamic>>
     locationMap = {};
 
     for (final row in locationRows) {
-      final premiseCode = int.tryParse(
+      final code =
+      int.tryParse(
         row['premise_code'].toString(),
       );
 
-      if (premiseCode != null) {
-        locationMap[premiseCode] =
+      if (code != null) {
+        locationMap[code] =
         Map<String, dynamic>.from(
           row,
         );
       }
     }
 
-    final List<StoreComparison> stores = [];
+    final stores =
+    <StoreComparison>[];
 
     for (final premiseCode
-    in completeStoreCodes) {
+    in storeCodes) {
       final premise =
       premiseMap[premiseCode];
-
-      final storePriceMap =
-      pricesByStore[premiseCode];
 
       final location =
       locationMap[premiseCode];
 
+      final recordCodes =
+      recordsByStore[premiseCode];
+
       if (premise == null ||
-          storePriceMap == null ||
-          location == null) {
+          location == null ||
+          recordCodes == null) {
         continue;
       }
 
-      final latitude = double.tryParse(
+      final latitude =
+      double.tryParse(
         location['latitude'].toString(),
       );
 
-      final longitude = double.tryParse(
+      final longitude =
+      double.tryParse(
         location['longitude'].toString(),
       );
 
@@ -232,52 +346,68 @@ class PriceComparisonService {
         continue;
       }
 
-      final List<StoreProductPrice>
-      storeProducts = [];
-
-      bool complete = true;
-
-      for (final itemCode
-      in itemsWithPrice) {
-        final latestPrice =
-        storePriceMap[itemCode];
-
-        final cartItem =
-        cartItemMap[itemCode];
-
-        if (latestPrice == null ||
-            cartItem == null) {
-          complete = false;
-          break;
-        }
-
-        storeProducts.add(
-          StoreProductPrice(
-            cartItem: cartItem,
-            unitPrice:
-            latestPrice.price,
-          ),
+      if (latitude < -90 ||
+          latitude > 90 ||
+          longitude < -180 ||
+          longitude > 180) {
+        print(
+          'INVALID STORE LOCATION | '
+              '${premise['premise']} | '
+              '$latitude,$longitude',
         );
-      }
 
-      if (!complete) {
         continue;
       }
 
-      double? straightLineDistanceKm;
+      final recordedItems =
+      <CartItem>[];
+
+      final pricedProducts =
+      <StoreProductPrice>[];
+
+      for (final itemCode
+      in recordCodes) {
+        final cartItem =
+        cartItemMap[itemCode];
+
+        if (cartItem == null) {
+          continue;
+        }
+
+        recordedItems.add(
+          cartItem,
+        );
+
+        final price =
+        pricesByStore[
+        premiseCode]?[itemCode];
+
+        if (price != null) {
+          pricedProducts.add(
+            StoreProductPrice(
+              cartItem: cartItem,
+              unitPrice: price,
+            ),
+          );
+        }
+      }
+
+      if (recordedItems.isEmpty) {
+        continue;
+      }
+
+      double? distanceKm;
 
       if (userLatitude != null &&
           userLongitude != null) {
-        final meters =
-        Geolocator.distanceBetween(
-          userLatitude,
-          userLongitude,
-          latitude,
-          longitude,
-        );
-
-        straightLineDistanceKm =
-            meters / 1000.0;
+        distanceKm =
+            Geolocator.distanceBetween(
+              userLatitude,
+              userLongitude,
+              latitude,
+              longitude,
+            ) /
+                1000;
       }
 
       stores.add(
@@ -301,13 +431,15 @@ class PriceComparisonService {
               ?.toString() ??
               '',
           products:
-          storeProducts,
+          pricedProducts,
+          recordedItems:
+          recordedItems,
           latitude:
           latitude,
           longitude:
           longitude,
           distanceKm:
-          straightLineDistanceKm,
+          distanceKm,
         ),
       );
     }
@@ -319,49 +451,41 @@ class PriceComparisonService {
     if (userLatitude == null ||
         userLongitude == null) {
       stores.sort(
-            (a, b) =>
-            a.totalPrice.compareTo(
-              b.totalPrice,
-            ),
+        _compareStores,
       );
 
-      return stores.take(3).toList();
+      return stores;
     }
 
-    final straightLineCandidates =
-    stores
-        .where(
-          (store) =>
-      store.distanceKm != null,
-    )
-        .toList();
-
-    straightLineCandidates.sort(
+    stores.sort(
           (a, b) =>
-          a.distanceKm!.compareTo(
-            b.distanceKm!,
+          (a.distanceKm ?? 999999)
+              .compareTo(
+            b.distanceKm ?? 999999,
           ),
     );
 
-    final routeCandidates =
-    straightLineCandidates
+    final candidates = stores
         .take(maxRouteCandidates)
         .toList();
 
     print('======================================');
     print(
       'ROUTE API CANDIDATES: '
-          '${routeCandidates.length}',
+          '${candidates.length}',
     );
     print('======================================');
 
-    final List<StoreComparison>
-    nearbyStores = [];
+    final nearbyStores =
+    <StoreComparison>[];
 
     for (final store
-    in routeCandidates) {
+    in candidates) {
+      double distance =
+          store.distanceKm ?? 999999;
+
       try {
-        final drivingDistanceKm =
+        distance =
         await getDrivingDistanceKm(
           originLatitude:
           userLatitude,
@@ -374,37 +498,9 @@ class PriceComparisonService {
         );
 
         print(
-          '${store.premiseName} | '
-              'STRAIGHT ${store.distanceKm!.toStringAsFixed(2)} km | '
-              'DRIVING ${drivingDistanceKm.toStringAsFixed(2)} km',
-        );
-
-        if (drivingDistanceKm >
-            nearbyRadiusKm) {
-          continue;
-        }
-
-        nearbyStores.add(
-          StoreComparison(
-            premiseCode:
-            store.premiseCode,
-            premiseName:
-            store.premiseName,
-            address:
-            store.address,
-            premiseType:
-            store.premiseType,
-            state:
-            store.state,
-            products:
-            store.products,
-            latitude:
-            store.latitude,
-            longitude:
-            store.longitude,
-            distanceKm:
-            drivingDistanceKm,
-          ),
+          'ROUTE SUCCESS | '
+              '${store.premiseName} | '
+              '${distance.toStringAsFixed(2)} km',
         );
       } catch (e) {
         print(
@@ -412,25 +508,51 @@ class PriceComparisonService {
               '${store.premiseName} | '
               '$e',
         );
+
+        print(
+          'USING STRAIGHT-LINE FALLBACK | '
+              '${store.premiseName} | '
+              '${distance.toStringAsFixed(2)} km',
+        );
       }
+
+      if (distance >
+          nearbyRadiusKm) {
+        continue;
+      }
+
+      nearbyStores.add(
+        StoreComparison(
+          premiseCode:
+          store.premiseCode,
+          premiseName:
+          store.premiseName,
+          address:
+          store.address,
+          premiseType:
+          store.premiseType,
+          state:
+          store.state,
+          products:
+          store.products,
+          recordedItems:
+          store.recordedItems,
+          latitude:
+          store.latitude,
+          longitude:
+          store.longitude,
+          distanceKm:
+          distance,
+        ),
+      );
     }
 
     nearbyStores.sort(
-          (a, b) {
-        final scoreA =
-        getValueScore(a);
-
-        final scoreB =
-        getValueScore(b);
-
-        return scoreA.compareTo(
-          scoreB,
-        );
-      },
+      _compareStores,
     );
 
     print('======================================');
-    print('STORE VALUE RANKING');
+    print('STORE RANKING');
     print('======================================');
 
     for (int i = 0;
@@ -440,30 +562,371 @@ class PriceComparisonService {
       nearbyStores[i];
 
       print(
-        '#${i + 1} '
+        '#${i + 1} | '
             '${store.premiseName} | '
-            '${store.distanceKm?.toStringAsFixed(2)} km | '
+            '${store.coveredItemCount}/${cartItems.length} COVERED | '
+            '${store.pricedItemCount}/${cartItems.length} PRICED | '
             'RM ${store.totalPrice.toStringAsFixed(2)} | '
+            '${store.distanceKm?.toStringAsFixed(2)} KM | '
             'SCORE RM ${getValueScore(store).toStringAsFixed(2)}',
       );
     }
 
     print('======================================');
 
-    return nearbyStores.take(3).toList();
+    return nearbyStores;
+  }
+
+  int _compareStores(
+      StoreComparison a,
+      StoreComparison b,
+      ) {
+    final coverage =
+    b.coveredItemCount.compareTo(
+      a.coveredItemCount,
+    );
+
+    if (coverage != 0) {
+      return coverage;
+    }
+
+    final priced =
+    b.pricedItemCount.compareTo(
+      a.pricedItemCount,
+    );
+
+    if (priced != 0) {
+      return priced;
+    }
+
+    return getValueScore(a)
+        .compareTo(
+      getValueScore(b),
+    );
+  }
+
+  ShoppingPlan _buildSingleStorePlan(
+      StoreComparison store,
+      List<CartItem> cartItems,
+      ) {
+    final items =
+    <ShoppingPlanItem>[];
+
+    final priceMap = {
+      for (final product
+      in store.products)
+        product.cartItem.product.itemCode:
+        product.unitPrice,
+    };
+
+    for (final cartItem
+    in store.recordedItems) {
+      items.add(
+        ShoppingPlanItem(
+          cartItem:
+          cartItem,
+          unitPrice:
+          priceMap[
+          cartItem
+              .product
+              .itemCode],
+        ),
+      );
+    }
+
+    final knownTotal =
+    items.fold<double>(
+      0,
+          (total, item) =>
+      total +
+          item.subtotal,
+    );
+
+    final distance =
+        store.distanceKm ?? 0;
+
+    return ShoppingPlan(
+      stores: [
+        ShoppingPlanStore(
+          store:
+          store,
+          items:
+          items,
+        ),
+      ],
+      coveredItemCount:
+      items.length,
+      pricedItemCount:
+      items
+          .where(
+            (item) =>
+        item.hasPrice,
+      )
+          .length,
+      totalItemCount:
+      cartItems.length,
+      knownPriceTotal:
+      knownTotal,
+      travelDistanceKm:
+      distance,
+      valueScore:
+      knownTotal +
+          distance *
+              travelCostPerKm,
+    );
+  }
+
+  ShoppingPlan _buildTwoStorePlan(
+      StoreComparison storeA,
+      StoreComparison storeB,
+      List<CartItem> cartItems,
+      ) {
+    final recordA =
+        storeA.recordedItemCodes;
+
+    final recordB =
+        storeB.recordedItemCodes;
+
+    final priceA = {
+      for (final product
+      in storeA.products)
+        product.cartItem.product.itemCode:
+        product.unitPrice,
+    };
+
+    final priceB = {
+      for (final product
+      in storeB.products)
+        product.cartItem.product.itemCode:
+        product.unitPrice,
+    };
+
+    final itemsA =
+    <ShoppingPlanItem>[];
+
+    final itemsB =
+    <ShoppingPlanItem>[];
+
+    int covered = 0;
+    int priced = 0;
+    double knownTotal = 0;
+
+    for (final cartItem
+    in cartItems) {
+      final code =
+          cartItem.product.itemCode;
+
+      final hasA =
+      recordA.contains(code);
+
+      final hasB =
+      recordB.contains(code);
+
+      if (!hasA && !hasB) {
+        continue;
+      }
+
+      covered++;
+
+      final aPrice =
+      priceA[code];
+
+      final bPrice =
+      priceB[code];
+
+      if (aPrice != null &&
+          bPrice != null) {
+        priced++;
+
+        if (aPrice <= bPrice) {
+          itemsA.add(
+            ShoppingPlanItem(
+              cartItem:
+              cartItem,
+              unitPrice:
+              aPrice,
+            ),
+          );
+
+          knownTotal +=
+              aPrice *
+                  cartItem.quantity;
+        } else {
+          itemsB.add(
+            ShoppingPlanItem(
+              cartItem:
+              cartItem,
+              unitPrice:
+              bPrice,
+            ),
+          );
+
+          knownTotal +=
+              bPrice *
+                  cartItem.quantity;
+        }
+
+        continue;
+      }
+
+      if (aPrice != null) {
+        priced++;
+
+        itemsA.add(
+          ShoppingPlanItem(
+            cartItem:
+            cartItem,
+            unitPrice:
+            aPrice,
+          ),
+        );
+
+        knownTotal +=
+            aPrice *
+                cartItem.quantity;
+
+        continue;
+      }
+
+      if (bPrice != null) {
+        priced++;
+
+        itemsB.add(
+          ShoppingPlanItem(
+            cartItem:
+            cartItem,
+            unitPrice:
+            bPrice,
+          ),
+        );
+
+        knownTotal +=
+            bPrice *
+                cartItem.quantity;
+
+        continue;
+      }
+
+      if (hasA) {
+        itemsA.add(
+          ShoppingPlanItem(
+            cartItem:
+            cartItem,
+            unitPrice:
+            null,
+          ),
+        );
+      } else {
+        itemsB.add(
+          ShoppingPlanItem(
+            cartItem:
+            cartItem,
+            unitPrice:
+            null,
+          ),
+        );
+      }
+    }
+
+    final planStores =
+    <ShoppingPlanStore>[];
+
+    if (itemsA.isNotEmpty) {
+      planStores.add(
+        ShoppingPlanStore(
+          store:
+          storeA,
+          items:
+          itemsA,
+        ),
+      );
+    }
+
+    if (itemsB.isNotEmpty) {
+      planStores.add(
+        ShoppingPlanStore(
+          store:
+          storeB,
+          items:
+          itemsB,
+        ),
+      );
+    }
+
+    double travelDistance = 0;
+
+    if (planStores.length == 1) {
+      travelDistance =
+          planStores.first
+              .store
+              .distanceKm ??
+              0;
+    }
+
+    if (planStores.length == 2) {
+      final distanceA =
+          storeA.distanceKm ?? 0;
+
+      final distanceB =
+          storeB.distanceKm ?? 0;
+
+      double betweenStores = 0;
+
+      if (storeA.latitude != null &&
+          storeA.longitude != null &&
+          storeB.latitude != null &&
+          storeB.longitude != null) {
+        betweenStores =
+            Geolocator.distanceBetween(
+              storeA.latitude!,
+              storeA.longitude!,
+              storeB.latitude!,
+              storeB.longitude!,
+            ) /
+                1000;
+      }
+
+      final routeAFirst =
+          distanceA +
+              betweenStores;
+
+      final routeBFirst =
+          distanceB +
+              betweenStores;
+
+      travelDistance =
+      routeAFirst <
+          routeBFirst
+          ? routeAFirst
+          : routeBFirst;
+    }
+
+    return ShoppingPlan(
+      stores:
+      planStores,
+      coveredItemCount:
+      covered,
+      pricedItemCount:
+      priced,
+      totalItemCount:
+      cartItems.length,
+      knownPriceTotal:
+      knownTotal,
+      travelDistanceKm:
+      travelDistance,
+      valueScore:
+      knownTotal +
+          travelDistance *
+              travelCostPerKm,
+    );
   }
 
   double getValueScore(
       StoreComparison store,
       ) {
-    final distanceKm =
-        store.distanceKm ?? 999;
-
     return store.totalPrice +
-        (
-            distanceKm *
-                travelCostPerKm
-        );
+        (store.distanceKm ?? 0) *
+            travelCostPerKm;
   }
 
   Future<double> getDrivingDistanceKm({
@@ -474,19 +937,25 @@ class PriceComparisonService {
   }) async {
     if (googleMapsApiKey.isEmpty ||
         googleMapsApiKey ==
-            'YOUR_GOOGLE_MAPS_API_KEY') {
+            'AIzaSyCw9eR0wNRnT78Pqk6l5IR6mB3MLfu468I') {
       throw Exception(
         'Google Maps API Key is missing.',
       );
     }
 
-    final uri = Uri.parse(
-      'https://routes.googleapis.com/'
-          'directions/v2:computeRoutes',
+    print(
+      'ROUTE REQUEST | '
+          'ORIGIN '
+          '$originLatitude,$originLongitude | '
+          'DESTINATION '
+          '$destinationLatitude,$destinationLongitude',
     );
 
-    final response = await http.post(
-      uri,
+    final response =
+    await http.post(
+      Uri.parse(
+        'https://routes.googleapis.com/directions/v2:computeRoutes',
+      ),
       headers: {
         'Content-Type':
         'application/json',
@@ -495,38 +964,34 @@ class PriceComparisonService {
         'X-Goog-FieldMask':
         'routes.distanceMeters,routes.duration',
       },
-      body: jsonEncode(
-        {
-          'origin': {
-            'location': {
-              'latLng': {
-                'latitude':
-                originLatitude,
-                'longitude':
-                originLongitude,
-              },
+      body: jsonEncode({
+        'origin': {
+          'location': {
+            'latLng': {
+              'latitude':
+              originLatitude,
+              'longitude':
+              originLongitude,
             },
           },
-          'destination': {
-            'location': {
-              'latLng': {
-                'latitude':
-                destinationLatitude,
-                'longitude':
-                destinationLongitude,
-              },
-            },
-          },
-          'travelMode':
-          'DRIVE',
-          'routingPreference':
-          'TRAFFIC_AWARE',
-          'computeAlternativeRoutes':
-          false,
-          'units':
-          'METRIC',
         },
-      ),
+        'destination': {
+          'location': {
+            'latLng': {
+              'latitude':
+              destinationLatitude,
+              'longitude':
+              destinationLongitude,
+            },
+          },
+        },
+        'travelMode':
+        'DRIVE',
+        'routingPreference':
+        'TRAFFIC_AWARE',
+        'computeAlternativeRoutes':
+        false,
+      }),
     );
 
     if (response.statusCode != 200) {
@@ -536,7 +1001,8 @@ class PriceComparisonService {
       );
 
       print(
-        response.body,
+        'ROUTES API BODY: '
+            '${response.body}',
       );
 
       throw Exception(
@@ -548,7 +1014,7 @@ class PriceComparisonService {
     final data =
     jsonDecode(
       response.body,
-    ) as Map<String, dynamic>;
+    );
 
     final routes =
     data['routes'] as List?;
@@ -561,14 +1027,13 @@ class PriceComparisonService {
     }
 
     final route =
-    Map<String, dynamic>.from(
-      routes.first as Map,
-    );
+        routes.first;
 
     final distanceMeters =
-    (route['distanceMeters']
-    as num?)
-        ?.toDouble();
+    double.tryParse(
+      route['distanceMeters']
+          .toString(),
+    );
 
     if (distanceMeters == null) {
       throw Exception(
@@ -576,16 +1041,11 @@ class PriceComparisonService {
       );
     }
 
-    return distanceMeters / 1000.0;
+    print(
+      'ROUTE DISTANCE: '
+          '${(distanceMeters / 1000).toStringAsFixed(2)} km',
+    );
+
+    return distanceMeters / 1000;
   }
-}
-
-class _LatestPrice {
-  final double price;
-  final String date;
-
-  const _LatestPrice({
-    required this.price,
-    required this.date,
-  });
 }

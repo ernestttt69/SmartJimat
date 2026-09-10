@@ -1,94 +1,105 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/cart_item.dart';
 import '../models/product.dart';
+import 'cart_store.dart';
 
 class ShoppingCartService extends ChangeNotifier {
-  ShoppingCartService._();
+  ShoppingCartService({required CartStore store}) : _store = store;
+  static final instance = ShoppingCartService(store: SqliteCartStore());
+  final CartStore _store;
+  List<CartItem> _items = [];
+  String? _userId;
+  bool _ready = false;
+  int _generation = 0;
+  Future<void> _pending = Future.value();
 
-  static final ShoppingCartService instance =
-  ShoppingCartService._();
-
-  final List<CartItem> _items = [];
-
-  List<CartItem> get items => List.unmodifiable(_items);
-
+  List<CartItem> get items => List.unmodifiable(_copy(_items));
+  String? get userId => _userId;
   int get totalUniqueItems => _items.length;
+  int get totalQuantity => _items.fold(0, (sum, item) => sum + item.quantity);
 
-  int get totalQuantity {
-    int total = 0;
+  static List<CartItem> _copy(List<CartItem> items) => items
+      .map((item) => CartItem(product: item.product, quantity: item.quantity))
+      .toList();
 
-    for (final item in _items) {
-      total += item.quantity;
-    }
-
-    return total;
+  /// Clear visible data on account changes, without deleting saved data.
+  Future<void> bindUser(String? userId) async {
+    final generation = ++_generation;
+    _ready = false;
+    _userId = userId;
+    _items = [];
+    notifyListeners();
+    await _pending;
+    if (generation != _generation || userId == null) return;
+    final saved = await _store.load(userId);
+    if (generation != _generation) return;
+    _items = saved;
+    _ready = true;
+    notifyListeners();
   }
 
-  void addProduct(Product product) {
-    final index = _items.indexWhere(
-          (item) => item.product.itemCode == product.itemCode,
-    );
+  Future<void> flush() => _pending;
 
-    if (index >= 0) {
-      _items[index].quantity++;
-    } else {
-      _items.add(
-        CartItem(
-          product: product,
-          quantity: 1,
-        ),
+  /// Persist edits in order before notifying the UI that they succeeded.
+  Future<void> _edit(void Function(List<CartItem>) change) {
+    final userId = _userId;
+    final generation = _generation;
+    if (!_ready || userId == null) {
+      return Future.error(
+        StateError('Please log in and wait for your cart to load.'),
       );
     }
-
-    notifyListeners();
+    final result = _pending.then((_) async {
+      if (generation != _generation) {
+        throw StateError('Account changed. Please try again.');
+      }
+      final next = _copy(_items);
+      change(next);
+      await _store.save(userId, next);
+      if (generation == _generation) {
+        _items = next;
+        notifyListeners();
+      }
+    });
+    // A failed edit must not block subsequent writes. The caller gets the error.
+    _pending = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return result;
   }
 
-  void increaseQuantity(int itemCode) {
-    final index = _items.indexWhere(
-          (item) => item.product.itemCode == itemCode,
-    );
+  Future<void> addProduct(Product product, {String? expectedUserId}) =>
+      _edit((items) {
+        if (expectedUserId != null && expectedUserId != _userId) {
+          throw StateError('Account changed. Please try again.');
+        }
+        final index = items.indexWhere(
+          (item) => item.product.itemCode == product.itemCode,
+        );
+        if (index < 0) {
+          items.add(CartItem(product: product));
+        } else {
+          items[index].quantity++;
+        }
+      });
 
-    if (index == -1) return;
-
-    _items[index].quantity++;
-
-    notifyListeners();
-  }
-
-  void decreaseQuantity(int itemCode) {
-    final index = _items.indexWhere(
-          (item) => item.product.itemCode == itemCode,
-    );
-
-    if (index == -1) return;
-
-    if (_items[index].quantity > 1) {
-      _items[index].quantity--;
-    } else {
-      _items.removeAt(index);
+  Future<void> increaseQuantity(int itemCode) => _edit((items) {
+    for (final item in items) {
+      if (item.product.itemCode == itemCode) item.quantity++;
     }
+  });
 
-    notifyListeners();
-  }
+  Future<void> decreaseQuantity(int itemCode) => _edit((items) {
+    for (final item in items) {
+      if (item.product.itemCode == itemCode) item.quantity--;
+    }
+    items.removeWhere((item) => item.quantity <= 0);
+  });
 
-  void removeProduct(int itemCode) {
-    _items.removeWhere(
-          (item) => item.product.itemCode == itemCode,
-    );
+  Future<void> removeProduct(int itemCode) => _edit((items) {
+    items.removeWhere((item) => item.product.itemCode == itemCode);
+  });
 
-    notifyListeners();
-  }
-
-  void clearCart() {
-    _items.clear();
-
-    notifyListeners();
-  }
-
-  bool containsProduct(int itemCode) {
-    return _items.any(
-          (item) => item.product.itemCode == itemCode,
-    );
-  }
+  Future<void> clearCart() => _edit((items) => items.clear());
+  bool containsProduct(int itemCode) =>
+      _items.any((item) => item.product.itemCode == itemCode);
 }

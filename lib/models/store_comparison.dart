@@ -4,7 +4,7 @@ class StoreProductPrice {
   final CartItem cartItem;
   final double unitPrice;
 
-  StoreProductPrice({
+  const StoreProductPrice({
     required this.cartItem,
     required this.unitPrice,
   });
@@ -21,18 +21,19 @@ class StoreComparison {
   final String premiseType;
   final String state;
   final List<StoreProductPrice> products;
-
+  final List<CartItem> recordedItems;
   final double? latitude;
   final double? longitude;
   final double? distanceKm;
 
-  StoreComparison({
+  const StoreComparison({
     required this.premiseCode,
     required this.premiseName,
     required this.address,
     required this.premiseType,
     required this.state,
     required this.products,
+    this.recordedItems = const [],
     this.latitude,
     this.longitude,
     this.distanceKm,
@@ -50,16 +51,41 @@ class StoreComparison {
     return products.length;
   }
 
-  bool get hasLocation {
-    return latitude != null &&
-        longitude != null;
+  int get pricedItemCount {
+    return products.length;
   }
 
-  bool get isNearby {
-    if (distanceKm == null) {
-      return false;
-    }
+  int get coveredItemCount {
+    return recordedItems.length;
+  }
 
-    return distanceKm! <= 10;
+  Set<int> get recordedItemCodes {
+    return recordedItems
+        .map(
+          (item) => item.product.itemCode,
+    )
+        .toSet();
+  }
+
+  Set<int> get pricedItemCodes {
+    return products
+        .map(
+          (item) =>
+      item.cartItem.product.itemCode,
+    )
+        .toSet();
+  }
+
+  List<CartItem> get unpricedItems {
+    final pricedCodes = pricedItemCodes;
+
+    return recordedItems
+        .where(
+          (item) =>
+      !pricedCodes.contains(
+        item.product.itemCode,
+      ),
+    )
+        .toList();
   }
 }

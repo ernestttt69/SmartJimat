@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/cart_item.dart';
+import '../models/shopping_plan.dart';
 import '../models/store_comparison.dart';
 import '../services/location_service.dart';
 import '../services/price_comparison_service.dart';
@@ -29,30 +31,30 @@ class _RecommendationScreenState
 
   bool isLoading = true;
   String? errorMessage;
-
-  List<StoreComparison> stores = [];
+  List<ShoppingPlan> plans = [];
 
   @override
   void initState() {
     super.initState();
-    compareStores();
+    comparePlans();
   }
 
-  Future<void> compareStores() async {
+  Future<void> comparePlans() async {
     setState(() {
       isLoading = true;
       errorMessage = null;
     });
 
-    double? userLatitude;
-    double? userLongitude;
+    double? latitude;
+    double? longitude;
 
     try {
       final position =
-      await locationService.getCurrentLocation();
+      await locationService
+          .getCurrentLocation();
 
-      userLatitude = position.latitude;
-      userLongitude = position.longitude;
+      latitude = position.latitude;
+      longitude = position.longitude;
     } catch (e) {
       print(
         'LOCATION UNAVAILABLE: $e',
@@ -61,10 +63,11 @@ class _RecommendationScreenState
 
     try {
       final results =
-      await priceService.compareStores(
+      await priceService
+          .compareShoppingPlans(
         cart.items,
-        userLatitude: userLatitude,
-        userLongitude: userLongitude,
+        userLatitude: latitude,
+        userLongitude: longitude,
       );
 
       if (!mounted) {
@@ -72,7 +75,7 @@ class _RecommendationScreenState
       }
 
       setState(() {
-        stores = results.take(3).toList();
+        plans = results.take(2).toList();
         isLoading = false;
       });
     } catch (e) {
@@ -81,10 +84,35 @@ class _RecommendationScreenState
       }
 
       setState(() {
-        isLoading = false;
         errorMessage = e.toString();
+        isLoading = false;
       });
     }
+  }
+
+  List<CartItem> getMissingItems(
+      ShoppingPlan plan,
+      ) {
+    final coveredCodes = <int>{};
+
+    for (final planStore
+    in plan.stores) {
+      for (final item
+      in planStore.items) {
+        coveredCodes.add(
+          item.cartItem.product.itemCode,
+        );
+      }
+    }
+
+    return cart.items
+        .where(
+          (item) =>
+      !coveredCodes.contains(
+        item.product.itemCode,
+      ),
+    )
+        .toList();
   }
 
   @override
@@ -96,7 +124,7 @@ class _RecommendationScreenState
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         title: const Text(
-          'Store Recommendation',
+          'Shopping Plan',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 20,
@@ -104,8 +132,7 @@ class _RecommendationScreenState
         ),
         actions: [
           IconButton(
-            onPressed: compareStores,
-            tooltip: 'Refresh',
+            onPressed: comparePlans,
             icon: const Icon(
               Icons.refresh,
             ),
@@ -126,7 +153,7 @@ class _RecommendationScreenState
             CircularProgressIndicator(),
             SizedBox(height: 16),
             Text(
-              'Finding best value stores...',
+              'Finding best shopping plans...',
               style: TextStyle(
                 color: Colors.grey,
               ),
@@ -147,12 +174,12 @@ class _RecommendationScreenState
             children: [
               const Icon(
                 Icons.error_outline,
-                size: 58,
+                size: 60,
                 color: Colors.red,
               ),
               const SizedBox(height: 16),
               const Text(
-                'Unable to find stores',
+                'Unable to generate plan',
                 style: TextStyle(
                   fontSize: 21,
                   fontWeight:
@@ -170,7 +197,7 @@ class _RecommendationScreenState
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
-                onPressed: compareStores,
+                onPressed: comparePlans,
                 icon: const Icon(
                   Icons.refresh,
                 ),
@@ -184,56 +211,16 @@ class _RecommendationScreenState
       );
     }
 
-    if (stores.isEmpty) {
-      return Center(
-        child: Padding(
-          padding:
-          const EdgeInsets.all(28),
-          child: Column(
-            mainAxisAlignment:
-            MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.store_mall_directory_outlined,
-                size: 64,
-                color: Colors.grey,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'No Nearby Store Found',
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight:
-                  FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'No store within 15 km has usable price data for your selected items.',
-                textAlign:
-                TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 20),
-              OutlinedButton.icon(
-                onPressed: compareStores,
-                icon: const Icon(
-                  Icons.refresh,
-                ),
-                label: const Text(
-                  'Try Again',
-                ),
-              ),
-            ],
-          ),
+    if (plans.isEmpty) {
+      return const Center(
+        child: Text(
+          'No shopping plan found.',
         ),
       );
     }
 
     return RefreshIndicator(
-      onRefresh: compareStores,
+      onRefresh: comparePlans,
       child: ListView(
         physics:
         const AlwaysScrollableScrollPhysics(),
@@ -241,7 +228,7 @@ class _RecommendationScreenState
         const EdgeInsets.all(16),
         children: [
           const Text(
-            'Top Recommendations',
+            'Recommended Shopping Plans',
             style: TextStyle(
               fontSize: 22,
               fontWeight:
@@ -250,7 +237,7 @@ class _RecommendationScreenState
           ),
           const SizedBox(height: 4),
           const Text(
-            'Ranked by shopping price and driving distance',
+            'Plans prioritize item coverage, complete price information, price and distance.',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey,
@@ -258,11 +245,11 @@ class _RecommendationScreenState
           ),
           const SizedBox(height: 16),
           for (int i = 0;
-          i < stores.length;
+          i < plans.length;
           i++)
-            buildStoreCard(
-              store: stores[i],
-              rank: i,
+            buildPlanCard(
+              plans[i],
+              i,
             ),
           const SizedBox(height: 24),
         ],
@@ -270,49 +257,32 @@ class _RecommendationScreenState
     );
   }
 
-  Widget buildStoreCard({
-    required StoreComparison store,
-    required int rank,
-  }) {
-    final titles = [
-      'BEST OPTION',
-      'SECOND OPTION',
-      'THIRD OPTION',
-    ];
+  Widget buildPlanCard(
+      ShoppingPlan plan,
+      int rank,
+      ) {
+    final isBest = rank == 0;
 
-    final icons = [
-      Icons.workspace_premium,
-      Icons.looks_two,
-      Icons.looks_3,
-    ];
+    final title = isBest
+        ? 'BEST SHOPPING PLAN'
+        : 'ALTERNATIVE PLAN';
 
-    final distanceText =
-    store.distanceKm == null
-        ? 'Distance unavailable'
-        : '${store.distanceKm!.toStringAsFixed(2)} km';
-
-    final score =
-    priceService.getValueScore(
-      store,
-    );
-
-    final isBest =
-        rank == 0;
+    final missingItems =
+    getMissingItems(plan);
 
     return Container(
-      width: double.infinity,
       margin:
       const EdgeInsets.only(
-        bottom: 14,
+        bottom: 16,
       ),
       padding:
-      const EdgeInsets.all(18),
+      const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isBest
             ? const Color(0xFFE7F8EC)
             : Colors.white,
         borderRadius:
-        BorderRadius.circular(18),
+        BorderRadius.circular(16),
         border: Border.all(
           color: isBest
               ? const Color(0xFF38BB62)
@@ -325,39 +295,60 @@ class _RecommendationScreenState
         children: [
           Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration:
-                BoxDecoration(
-                  color: isBest
-                      ? const Color(
-                    0xFF38BB62,
-                  )
-                      : const Color(
-                    0xFFF0F1F2,
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icons[rank],
-                  color: isBest
-                      ? Colors.white
-                      : Colors.black87,
-                  size: 22,
-                ),
+              Icon(
+                isBest
+                    ? Icons
+                    .workspace_premium
+                    : Icons
+                    .recommend_outlined,
+                size: 20,
+                color: isBest
+                    ? const Color(
+                  0xFF249347,
+                )
+                    : Colors.black54,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  titles[rank],
+                  title,
                   style: TextStyle(
+                    fontWeight:
+                    FontWeight.bold,
                     color: isBest
                         ? const Color(
                       0xFF249347,
                     )
                         : Colors.black87,
                     fontSize: 13,
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                const EdgeInsets
+                    .symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration:
+                BoxDecoration(
+                  color: plan.isComplete
+                      ? const Color(
+                    0xFFDDF7E5,
+                  )
+                      : const Color(
+                    0xFFFFEBCB,
+                  ),
+                  borderRadius:
+                  BorderRadius
+                      .circular(20),
+                ),
+                child: Text(
+                  '${plan.coveredItemCount}/${plan.totalItemCount} Items',
+                  style:
+                  const TextStyle(
+                    fontSize: 11,
                     fontWeight:
                     FontWeight.bold,
                   ),
@@ -365,208 +356,426 @@ class _RecommendationScreenState
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Text(
-            store.premiseName,
-            style: const TextStyle(
-              fontSize: 19,
-              fontWeight:
-              FontWeight.bold,
-            ),
-          ),
-          if (store.address.isNotEmpty) ...[
-            const SizedBox(height: 5),
-            Text(
-              store.address,
-              maxLines: 2,
-              overflow:
-              TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 12,
-              ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: buildInfoBox(
-                  icon:
-                  Icons.directions_car_outlined,
-                  label:
-                  'Driving Distance',
-                  value:
-                  distanceText,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: buildInfoBox(
-                  icon:
-                  Icons.shopping_bag_outlined,
-                  label: 'Items',
-                  value:
-                  '${store.availableItemCount}/${cart.totalUniqueItems}',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'Shopping Total',
-            style: TextStyle(
-              color: Colors.grey,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'RM ${store.totalPrice.toStringAsFixed(2)}',
-            style: TextStyle(
-              color: isBest
-                  ? const Color(
-                0xFF249347,
-              )
-                  : Colors.black,
-              fontSize: 28,
-              fontWeight:
-              FontWeight.bold,
-            ),
-          ),
           const SizedBox(height: 5),
           Text(
-            'Value Score: RM ${score.toStringAsFixed(2)}',
+            '${plan.storeCount} ${plan.storeCount == 1 ? 'Store' : 'Stores'} • ${plan.pricedItemCount}/${plan.totalItemCount} Prices Known',
             style: const TextStyle(
               color: Colors.grey,
-              fontSize: 12,
-              fontWeight:
-              FontWeight.w500,
+              fontSize: 11,
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () {
-                    openGoogleMaps(
-                      store,
-                    );
-                  },
+          for (int i = 0;
+          i < plan.stores.length;
+          i++) ...[
+            buildPlanStore(
+              plan.stores[i],
+              i + 1,
+            ),
+            if (i <
+                plan.stores.length - 1)
+              const Padding(
+                padding:
+                EdgeInsets.symmetric(
+                  vertical: 14,
+                ),
+                child: Divider(),
+              ),
+          ],
+          if (missingItems.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            const Divider(),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(
+                  Icons
+                      .warning_amber_rounded,
+                  color: Colors.orange,
+                  size: 19,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  '${missingItems.length} item${missingItems.length == 1 ? '' : 's'} with no store record',
+                  style: const TextStyle(
+                    color: Colors.orange,
+                    fontWeight:
+                    FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            for (final item
+            in missingItems)
+              Padding(
+                padding:
+                const EdgeInsets.only(
+                  bottom: 6,
+                ),
+                child: Text(
+                  item.product.item,
                   style:
-                  FilledButton.styleFrom(
-                    backgroundColor:
-                    const Color(
-                      0xFF38BB62,
-                    ),
-                    padding:
-                    const EdgeInsets
-                        .symmetric(
-                      vertical: 13,
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.map_outlined,
-                    size: 20,
-                  ),
-                  label: const Text(
-                    'Maps',
+                  const TextStyle(
+                    fontSize: 12,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child:
-                OutlinedButton.icon(
-                  onPressed: () {
-                    openWaze(
-                      store,
-                    );
-                  },
-                  style:
-                  OutlinedButton
-                      .styleFrom(
-                    padding:
-                    const EdgeInsets
-                        .symmetric(
-                      vertical: 13,
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.navigation_outlined,
-                    size: 20,
-                  ),
-                  label: const Text(
-                    'Waze',
-                  ),
-                ),
-              ),
-            ],
+          ],
+          const SizedBox(height: 14),
+          const Divider(),
+          const SizedBox(height: 10),
+          buildSummaryRow(
+            'Known Price Total',
+            'RM ${plan.knownPriceTotal.toStringAsFixed(2)}',
+            true,
+          ),
+          const SizedBox(height: 8),
+          buildSummaryRow(
+            'Estimated Travel',
+            '${plan.travelDistanceKm.toStringAsFixed(2)} km',
+            false,
+          ),
+          const SizedBox(height: 8),
+          buildSummaryRow(
+            'Value Score',
+            'RM ${plan.valueScore.toStringAsFixed(2)}',
+            false,
           ),
         ],
       ),
     );
   }
 
-  Widget buildInfoBox({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
+  Widget buildPlanStore(
+      ShoppingPlanStore planStore,
+      int number,
+      ) {
+    final store =
+        planStore.store;
+
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              alignment:
+              Alignment.center,
+              decoration:
+              const BoxDecoration(
+                color:
+                Color(0xFF38BB62),
+                shape:
+                BoxShape.circle,
+              ),
+              child: Text(
+                '$number',
+                style:
+                const TextStyle(
+                  color: Colors.white,
+                  fontWeight:
+                  FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                store.premiseName,
+                style:
+                const TextStyle(
+                  fontSize: 15,
+                  fontWeight:
+                  FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (store.address.isNotEmpty) ...[
+          const SizedBox(height: 5),
+          Padding(
+            padding:
+            const EdgeInsets.only(
+              left: 37,
+            ),
+            child: Text(
+              store.address,
+              maxLines: 2,
+              overflow:
+              TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.grey,
+                fontSize: 10,
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: buildInfoBox(
+                Icons
+                    .shopping_bag_outlined,
+                'Buy Here',
+                '${planStore.itemCount} Items',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: buildInfoBox(
+                Icons
+                    .sell_outlined,
+                'Prices Known',
+                '${planStore.pricedItemCount}/${planStore.itemCount}',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: buildInfoBox(
+                Icons
+                    .directions_car_outlined,
+                'Distance',
+                store.distanceKm == null
+                    ? 'N/A'
+                    : '${store.distanceKm!.toStringAsFixed(2)} km',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        for (final item
+        in planStore.items)
+          Padding(
+            padding:
+            const EdgeInsets.only(
+              bottom: 10,
+            ),
+            child: Row(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment
+                        .start,
+                    children: [
+                      Text(
+                        item.cartItem
+                            .product.item,
+                        style:
+                        const TextStyle(
+                          fontSize: 12,
+                          fontWeight:
+                          FontWeight
+                              .w600,
+                        ),
+                      ),
+                      const SizedBox(
+                        height: 2,
+                      ),
+                      if (item.hasPrice)
+                        Text(
+                          'RM ${item.unitPrice!.toStringAsFixed(2)} × ${item.cartItem.quantity}',
+                          style:
+                          const TextStyle(
+                            color:
+                            Colors.grey,
+                            fontSize: 10,
+                          ),
+                        )
+                      else
+                        const Text(
+                          'Price Unavailable',
+                          style: TextStyle(
+                            color:
+                            Colors.orange,
+                            fontSize: 10,
+                            fontWeight:
+                            FontWeight
+                                .w600,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (item.hasPrice)
+                  Text(
+                    'RM ${item.subtotal.toStringAsFixed(2)}',
+                    style:
+                    const TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                      FontWeight.bold,
+                    ),
+                  )
+                else
+                  const Text(
+                    'Price Unavailable',
+                    style: TextStyle(
+                      color:
+                      Colors.orange,
+                      fontSize: 9,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 4),
+        Text(
+          'Known Subtotal: RM ${planStore.subtotal.toStringAsFixed(2)}',
+          style: const TextStyle(
+            fontWeight:
+            FontWeight.bold,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child:
+              FilledButton.icon(
+                onPressed: () {
+                  openGoogleMaps(
+                    store,
+                  );
+                },
+                style:
+                FilledButton
+                    .styleFrom(
+                  backgroundColor:
+                  const Color(
+                    0xFF38BB62,
+                  ),
+                ),
+                icon: const Icon(
+                  Icons.map_outlined,
+                  size: 17,
+                ),
+                label: const Text(
+                  'Maps',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child:
+              OutlinedButton.icon(
+                onPressed: () {
+                  openWaze(store);
+                },
+                icon: const Icon(
+                  Icons
+                      .navigation_outlined,
+                  size: 17,
+                ),
+                label: const Text(
+                  'Waze',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget buildInfoBox(
+      IconData icon,
+      String label,
+      String value,
+      ) {
     return Container(
       padding:
-      const EdgeInsets.all(10),
+      const EdgeInsets.all(9),
       decoration: BoxDecoration(
         color:
         const Color(0xFFF7F7F7),
         borderRadius:
-        BorderRadius.circular(12),
+        BorderRadius.circular(10),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
           Icon(
             icon,
-            size: 19,
+            size: 16,
             color:
             const Color(
               0xFF249347,
             ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style:
-                  const TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(
-                  height: 1,
-                ),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow:
-                  TextOverflow.ellipsis,
-                  style:
-                  const TextStyle(
-                    fontSize: 13,
-                    fontWeight:
-                    FontWeight.w600,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style:
+            const TextStyle(
+              color: Colors.grey,
+              fontSize: 8,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            value,
+            maxLines: 1,
+            overflow:
+            TextOverflow.ellipsis,
+            style:
+            const TextStyle(
+              fontSize: 10,
+              fontWeight:
+              FontWeight.w600,
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget buildSummaryRow(
+      String label,
+      String value,
+      bool highlight,
+      ) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: highlight
+                  ? FontWeight.bold
+                  : FontWeight.w500,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize:
+            highlight ? 19 : 12,
+            fontWeight:
+            FontWeight.bold,
+            color: highlight
+                ? const Color(
+              0xFF249347,
+            )
+                : Colors.black87,
+          ),
+        ),
+      ],
     );
   }
 
@@ -578,52 +787,41 @@ class _RecommendationScreenState
       await locationService
           .getCurrentLocation();
 
-      String destination;
-
-      if (store.latitude != null &&
-          store.longitude != null) {
-        destination =
-        '${store.latitude},${store.longitude}';
-      } else {
-        destination = [
-          store.premiseName,
-          store.address,
-          store.state,
-        ]
-            .where(
-              (value) =>
-          value.trim().isNotEmpty,
-        )
-            .join(', ');
-      }
-
-      final origin =
-          '${position.latitude},${position.longitude}';
+      final destination =
+      store.latitude != null &&
+          store.longitude != null
+          ? '${store.latitude},${store.longitude}'
+          : [
+        store.premiseName,
+        store.address,
+        store.state,
+      ]
+          .where(
+            (value) =>
+        value
+            .trim()
+            .isNotEmpty,
+      )
+          .join(', ');
 
       final uri = Uri.https(
         'www.google.com',
         '/maps/dir/',
         {
           'api': '1',
-          'origin': origin,
+          'origin':
+          '${position.latitude},${position.longitude}',
           'destination':
           destination,
           'travelmode': 'driving',
         },
       );
 
-      final opened =
       await launchUrl(
         uri,
         mode:
         LaunchMode.externalApplication,
       );
-
-      if (!opened) {
-        throw Exception(
-          'Unable to open Google Maps.',
-        );
-      }
     } catch (e) {
       if (!mounted) {
         return;
@@ -643,57 +841,41 @@ class _RecommendationScreenState
   Future<void> openWaze(
       StoreComparison store,
       ) async {
-    Uri uri;
+    final uri = store.latitude != null &&
+        store.longitude != null
+        ? Uri.https(
+      'www.waze.com',
+      '/ul',
+      {
+        'll':
+        '${store.latitude},${store.longitude}',
+        'navigate': 'yes',
+      },
+    )
+        : Uri.https(
+      'www.waze.com',
+      '/ul',
+      {
+        'q': [
+          store.premiseName,
+          store.address,
+          store.state,
+        ]
+            .where(
+              (value) =>
+          value
+              .trim()
+              .isNotEmpty,
+        )
+            .join(', '),
+        'navigate': 'yes',
+      },
+    );
 
-    if (store.latitude != null &&
-        store.longitude != null) {
-      uri = Uri.https(
-        'www.waze.com',
-        '/ul',
-        {
-          'll':
-          '${store.latitude},${store.longitude}',
-          'navigate': 'yes',
-        },
-      );
-    } else {
-      final destination = [
-        store.premiseName,
-        store.address,
-        store.state,
-      ]
-          .where(
-            (value) =>
-        value.trim().isNotEmpty,
-      )
-          .join(', ');
-
-      uri = Uri.https(
-        'www.waze.com',
-        '/ul',
-        {
-          'q': destination,
-          'navigate': 'yes',
-        },
-      );
-    }
-
-    final opened =
     await launchUrl(
       uri,
       mode:
       LaunchMode.externalApplication,
     );
-
-    if (!opened && mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to open Waze.',
-          ),
-        ),
-      );
-    }
   }
 }

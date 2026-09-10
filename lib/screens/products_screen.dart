@@ -99,8 +99,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
-  void addProduct(Product product) {
-    cart.addProduct(product);
+  Future<void> addProduct(Product product) async {
+    try {
+      await cart.addProduct(product);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to save shopping list: $e')),
+      );
+      return;
+    }
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import 'dashboard_screen.dart';
+import 'customer_home_screen.dart';
 import 'search_shop_screen.dart';
 import 'profile_screen.dart';
 
@@ -89,7 +90,7 @@ class _MainNavigationScreenState
 
         if (shouldExit &&
             context.mounted) {
-          Navigator.of(context).pop();
+          await SystemNavigator.pop();
         }
       },
       child: Scaffold(
@@ -99,7 +100,7 @@ class _MainNavigationScreenState
             buildNavigator(
               index: 0,
               page:
-              const DashboardScreen(),
+              const CustomerHomeScreen(),
             ),
             buildNavigator(
               index: 1,
@@ -138,7 +139,7 @@ class _MainNavigationScreenState
                   0xFF38BB62,
                 ),
               ),
-              label: 'Dashboard',
+              label: 'Home',
             ),
             NavigationDestination(
               icon: Icon(

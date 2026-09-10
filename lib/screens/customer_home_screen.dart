@@ -2,22 +2,29 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
 import '../utils/translation_helper.dart';
+import 'ai_chat_screen.dart';
 import 'search_results_screen.dart';
 import 'shopping_list_screen.dart';
 import 'subcategory_screen.dart';
 
-class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+class CustomerHomeScreen extends StatefulWidget {
+  const CustomerHomeScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  State<CustomerHomeScreen> createState() =>
+      _CustomerHomeState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  final SupabaseService supabaseService = SupabaseService();
-  final TextEditingController searchController = TextEditingController();
+class _CustomerHomeState
+    extends State<CustomerHomeScreen> {
+  final SupabaseService supabaseService =
+  SupabaseService();
+
+  final TextEditingController searchController =
+  TextEditingController();
 
   bool isLoading = true;
+
   List<String> itemGroups = [];
 
   @override
@@ -34,16 +41,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> loadGroups() async {
     try {
-      final groups = await supabaseService.getItemGroups();
+      final groups =
+      await supabaseService.getItemGroups();
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         itemGroups = groups;
         isLoading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         isLoading = false;
@@ -51,19 +63,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to load categories: $e'),
+          content:
+          Text('Failed to load categories: $e'),
         ),
       );
     }
   }
 
   void searchProduct() {
-    final keyword = searchController.text.trim();
+    final keyword =
+    searchController.text.trim();
 
     if (keyword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter a product name'),
+          content:
+          Text('Please enter a product name'),
         ),
       );
       return;
@@ -72,9 +87,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SearchResultsScreen(
-          keyword: keyword,
-        ),
+        builder: (context) =>
+            SearchResultsScreen(
+              keyword: keyword,
+            ),
       ),
     );
   }
@@ -112,8 +128,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F8),
-
+      backgroundColor:
+      const Color(0xFFF6F7F8),
       appBar: AppBar(
         backgroundColor: Colors.white,
         title: Row(
@@ -124,16 +140,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
               height: 65,
               fit: BoxFit.contain,
             ),
-            SizedBox(width: 8),
-            Text(
+            const SizedBox(width: 8),
+            const Text(
               'SmartJimat',
               style: TextStyle(
-                fontWeight: FontWeight.bold,
+                fontWeight:
+                FontWeight.bold,
               ),
             ),
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'SmartJimat AI',
+            icon: const Icon(
+              Icons.smart_toy_outlined,
+              color: Color(0xFF38BB62),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                  const AiChatScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Shopping List',
             icon: const Icon(
@@ -152,26 +185,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(width: 8),
         ],
       ),
-
       body: RefreshIndicator(
         onRefresh: loadGroups,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding:
+          const EdgeInsets.all(20),
           children: [
-            // =========================
-            // Welcome Title
-            // =========================
-
             const Text(
               'Find cheaper groceries',
               style: TextStyle(
                 fontSize: 28,
-                fontWeight: FontWeight.bold,
+                fontWeight:
+                FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 6),
-
             const Text(
               'Search or browse grocery categories to start saving.',
               style: TextStyle(
@@ -179,81 +207,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: Colors.grey,
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // =========================
-            // Search Bar
-            // =========================
-
             TextField(
-              controller: searchController,
-              textInputAction: TextInputAction.search,
-              onSubmitted: (_) => searchProduct(),
+              controller:
+              searchController,
+              textInputAction:
+              TextInputAction.search,
+              onSubmitted: (_) =>
+                  searchProduct(),
               decoration: InputDecoration(
-                hintText: 'Search product name...',
-                prefixIcon: const Icon(
+                hintText:
+                'Search product name...',
+                prefixIcon:
+                const Icon(
                   Icons.search,
                 ),
-                suffixIcon: IconButton(
+                suffixIcon:
+                IconButton(
                   tooltip: 'Search',
                   icon: const Icon(
                     Icons.arrow_forward,
                   ),
-                  onPressed: searchProduct,
+                  onPressed:
+                  searchProduct,
                 ),
                 filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(
+                fillColor:
+                Colors.white,
+                contentPadding:
+                const EdgeInsets
+                    .symmetric(
                   horizontal: 18,
                   vertical: 18,
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
+                border:
+                OutlineInputBorder(
+                  borderRadius:
+                  BorderRadius.circular(
+                    16,
+                  ),
+                  borderSide:
+                  BorderSide.none,
                 ),
               ),
             ),
-
             const SizedBox(height: 32),
-
-            // =========================
-            // Category Header
-            // =========================
-
             const Text(
               'Shop by Category',
               style: TextStyle(
                 fontSize: 22,
-                fontWeight: FontWeight.bold,
+                fontWeight:
+                FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 6),
-
             const Text(
               'Choose a grocery category',
               style: TextStyle(
                 color: Colors.grey,
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // =========================
-            // Categories
-            // =========================
-
             if (isLoading)
               const Padding(
-                padding: EdgeInsets.all(40),
+                padding:
+                EdgeInsets.all(40),
                 child: Center(
-                  child: CircularProgressIndicator(),
+                  child:
+                  CircularProgressIndicator(),
                 ),
               )
             else if (itemGroups.isEmpty)
               const Padding(
-                padding: EdgeInsets.all(40),
+                padding:
+                EdgeInsets.all(40),
                 child: Center(
                   child: Text(
                     'No categories found',
@@ -263,83 +290,126 @@ class _DashboardScreenState extends State<DashboardScreen> {
             else
               GridView.builder(
                 shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: itemGroups.length,
+                physics:
+                const NeverScrollableScrollPhysics(),
+                itemCount:
+                itemGroups.length,
                 gridDelegate:
                 const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 280,
+                  maxCrossAxisExtent:
+                  280,
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 14,
-                  childAspectRatio: 1.10,
+                  childAspectRatio:
+                  1.10,
                 ),
-                itemBuilder: (context, index) {
-                  final originalGroup = itemGroups[index];
+                itemBuilder:
+                    (context, index) {
+                  final originalGroup =
+                  itemGroups[index];
 
                   final englishGroup =
-                  TranslationHelper.translate(
+                  TranslationHelper
+                      .translate(
                     originalGroup,
                   );
 
                   return InkWell(
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius:
+                    BorderRadius.circular(
+                      18,
+                    ),
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
+                          builder:
+                              (context) =>
                               SubcategoryScreen(
-                                // IMPORTANT:
-                                // Send original Malay value to Supabase
-                                itemGroup: originalGroup,
+                                itemGroup:
+                                originalGroup,
                               ),
                         ),
                       );
                     },
                     child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
+                      padding:
+                      const EdgeInsets
+                          .all(18),
+                      decoration:
+                      BoxDecoration(
+                        color:
+                        Colors.white,
+                        borderRadius:
+                        BorderRadius
+                            .circular(
+                          18,
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(
+                            color: Colors
+                                .black
+                                .withValues(
                               alpha: 0.04,
                             ),
                             blurRadius: 8,
-                            offset: const Offset(0, 3),
+                            offset:
+                            const Offset(
+                              0,
+                              3,
+                            ),
                           ),
                         ],
                       ),
                       child: Column(
                         mainAxisAlignment:
-                        MainAxisAlignment.center,
+                        MainAxisAlignment
+                            .center,
                         children: [
                           Container(
                             width: 58,
                             height: 58,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE7F8EC),
+                            decoration:
+                            BoxDecoration(
+                              color:
+                              const Color(
+                                0xFFE7F8EC,
+                              ),
                               borderRadius:
-                              BorderRadius.circular(16),
+                              BorderRadius
+                                  .circular(
+                                16,
+                              ),
                             ),
                             child: Icon(
-                              getGroupIcon(originalGroup),
+                              getGroupIcon(
+                                originalGroup,
+                              ),
                               color:
-                              const Color(0xFF38BB62),
+                              const Color(
+                                0xFF38BB62,
+                              ),
                               size: 30,
                             ),
                           ),
-
-                          const SizedBox(height: 12),
-
+                          const SizedBox(
+                            height: 12,
+                          ),
                           Text(
                             englishGroup,
-                            textAlign: TextAlign.center,
+                            textAlign:
+                            TextAlign
+                                .center,
                             maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            overflow:
+                            TextOverflow
+                                .ellipsis,
+                            style:
+                            const TextStyle(
                               fontSize: 15,
-                              fontWeight: FontWeight.w600,
+                              fontWeight:
+                              FontWeight
+                                  .w600,
                             ),
                           ),
                         ],

@@ -37,8 +37,15 @@ dependencies:
   supabase_flutter: ^2.17.2
   http: ^1.6.0
   geolocator: ^14.0.3
+  sqflite: ^2.4.0
+  path: ^1.9.0
+  shared_preferences: ^2.5.5
+  image_picker: ^1.2.3
+  url_launcher: ^6.3.2
 
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   flutter_test:
     sdk: flutter
 
@@ -92,3 +99,4 @@ flutter:
   # see https://flutter.dev/to/font-from-package
   assets:
     - assets/images/smart_jimat_icon.jpeg
+    - assets/images/smartjimat_logo.png

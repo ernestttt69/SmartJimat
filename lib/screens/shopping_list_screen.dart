@@ -36,6 +36,16 @@ class _ShoppingListScreenState
     }
   }
 
+  Future<void> updateCart(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to save shopping list: $e')),
+      );
+    }
+  }
+
   void confirmClearCart() {
     showDialog(
       context: context,
@@ -58,7 +68,7 @@ class _ShoppingListScreenState
             ),
             FilledButton(
               onPressed: () {
-                cart.clearCart();
+                updateCart(cart.clearCart);
 
                 Navigator.pop(context);
               },
@@ -239,11 +249,7 @@ class _ShoppingListScreenState
                                     tooltip:
                                     'Decrease',
                                     onPressed: () {
-                                      cart
-                                          .decreaseQuantity(
-                                        product
-                                            .itemCode,
-                                      );
+                                      updateCart(() => cart.decreaseQuantity(product.itemCode));
                                     },
                                     icon: const Icon(
                                       Icons
@@ -275,11 +281,7 @@ class _ShoppingListScreenState
                                     tooltip:
                                     'Increase',
                                     onPressed: () {
-                                      cart
-                                          .increaseQuantity(
-                                        product
-                                            .itemCode,
-                                      );
+                                      updateCart(() => cart.increaseQuantity(product.itemCode));
                                     },
                                     icon: const Icon(
                                       Icons
@@ -294,11 +296,7 @@ class _ShoppingListScreenState
                                     tooltip:
                                     'Remove',
                                     onPressed: () {
-                                      cart
-                                          .removeProduct(
-                                        product
-                                            .itemCode,
-                                      );
+                                      updateCart(() => cart.removeProduct(product.itemCode));
                                     },
                                     icon: const Icon(
                                       Icons
