@@ -16,6 +16,12 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState
     extends State<MainNavigationScreen> {
+  static const Color smartJimatGreen =
+  Color(0xFF38BB62);
+
+  static const Color darkGreen =
+  Color(0xFF2E9F52);
+
   int selectedIndex = 0;
 
   final List<GlobalKey<NavigatorState>> navigatorKeys = [
@@ -100,69 +106,61 @@ class _MainNavigationScreenState
           children: [
             buildNavigator(
               index: 0,
-              page:
-              const CustomerHomeScreen(),
+              page: const CustomerHomeScreen(),
             ),
             buildNavigator(
               index: 1,
-              page:
-              const SearchShopScreen(),
+              page: const SearchShopScreen(),
             ),
             buildNavigator(
               index: 2,
-              page:
-              const ProfileScreen(),
+              page: const ProfileScreen(),
             ),
           ],
         ),
-        bottomNavigationBar:
-        NavigationBar(
-          selectedIndex:
-          selectedIndex,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: selectedIndex,
           onDestinationSelected:
           onDestinationSelected,
           backgroundColor:
-          Colors.white,
+          smartJimatGreen,
           indicatorColor:
-          const Color(
-            0xFFE1F6E8,
-          ),
+          Colors.white,
+          labelBehavior:
+          NavigationDestinationLabelBehavior
+              .alwaysShow,
           height: 72,
-          destinations:
-          const [
+          destinations: const [
             NavigationDestination(
               icon: Icon(
                 Icons.home_outlined,
+                color: Colors.white,
               ),
               selectedIcon: Icon(
                 Icons.home,
-                color: Color(
-                  0xFF38BB62,
-                ),
+                color: darkGreen,
               ),
               label: 'Home',
             ),
             NavigationDestination(
               icon: Icon(
                 Icons.store_outlined,
+                color: Colors.white,
               ),
               selectedIcon: Icon(
                 Icons.store,
-                color: Color(
-                  0xFF38BB62,
-                ),
+                color: darkGreen,
               ),
               label: 'Search Shop',
             ),
             NavigationDestination(
               icon: Icon(
                 Icons.person_outline,
+                color: Colors.white,
               ),
               selectedIcon: Icon(
                 Icons.person,
-                color: Color(
-                  0xFF38BB62,
-                ),
+                color: darkGreen,
               ),
               label: 'Profile',
             ),

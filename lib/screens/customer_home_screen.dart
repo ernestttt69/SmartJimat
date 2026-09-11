@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/data_gov_service.dart';
 import '../services/supabase_service.dart';
 import 'ai_chat_screen.dart';
 import 'search_results_screen.dart';
@@ -10,19 +11,17 @@ class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
 
   @override
-  State<CustomerHomeScreen> createState() =>
-      _CustomerHomeState();
+  State<CustomerHomeScreen> createState() => _CustomerHomeState();
 }
 
-class _CustomerHomeState
-    extends State<CustomerHomeScreen> {
-  final SupabaseService supabaseService =
-  SupabaseService();
+class _CustomerHomeState extends State<CustomerHomeScreen> {
+  final SupabaseService supabaseService = SupabaseService();
+  final DataGovService dataGovService = DataGovService();
 
-  final TextEditingController searchController =
-  TextEditingController();
+  final TextEditingController searchController = TextEditingController();
 
   bool isLoading = true;
+  bool isDownloadingData = false;
 
   List<String> itemGroups = [];
 
@@ -40,8 +39,7 @@ class _CustomerHomeState
 
   Future<void> loadGroups() async {
     try {
-      final groups =
-      await supabaseService.getItemGroups();
+      final groups = await supabaseService.getItemGroups();
 
       if (!mounted) {
         return;
@@ -62,22 +60,67 @@ class _CustomerHomeState
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-          Text('Failed to load categories: $e'),
+          content: Text(
+            'Failed to load categories: $e',
+          ),
         ),
       );
     }
   }
 
+  Future<void> downloadPriceCatcherData() async {
+    if (isDownloadingData) {
+      return;
+    }
+
+    setState(() {
+      isDownloadingData = true;
+    });
+
+    try {
+      await dataGovService.downloadCurrentMonthPriceCatcherCsv();
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Latest grocery price data updated successfully.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to update grocery price data. Please try again.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isDownloadingData = false;
+        });
+      }
+    }
+  }
+
   void searchProduct() {
-    final keyword =
-    searchController.text.trim();
+    final keyword = searchController.text.trim();
 
     if (keyword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content:
-          Text('Please enter a product name'),
+          content: Text(
+            'Please enter a product name',
+          ),
         ),
       );
       return;
@@ -86,10 +129,9 @@ class _CustomerHomeState
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            SearchResultsScreen(
-              keyword: keyword,
-            ),
+        builder: (context) => SearchResultsScreen(
+          keyword: keyword,
+        ),
       ),
     );
   }
@@ -127,8 +169,7 @@ class _CustomerHomeState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-      const Color(0xFFF6F7F8),
+      backgroundColor: const Color(0xFFF6F7F8),
       appBar: AppBar(
         backgroundColor: Colors.white,
         title: Row(
@@ -143,8 +184,7 @@ class _CustomerHomeState
             const Text(
               'SmartJimat',
               style: TextStyle(
-                fontWeight:
-                FontWeight.bold,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -160,11 +200,27 @@ class _CustomerHomeState
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                  const AiChatScreen(),
+                  builder: (context) => const AiChatScreen(),
                 ),
               );
             },
+          ),
+          IconButton(
+            tooltip: 'Update Grocery Prices',
+            onPressed:
+            isDownloadingData ? null : downloadPriceCatcherData,
+            icon: isDownloadingData
+                ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            )
+                : const Icon(
+              Icons.sync,
+              color: Color(0xFF38BB62),
+            ),
           ),
           IconButton(
             tooltip: 'Shopping List',
@@ -175,8 +231,7 @@ class _CustomerHomeState
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                  const ShoppingListScreen(),
+                  builder: (context) => const ShoppingListScreen(),
                 ),
               );
             },
@@ -187,15 +242,13 @@ class _CustomerHomeState
       body: RefreshIndicator(
         onRefresh: loadGroups,
         child: ListView(
-          padding:
-          const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           children: [
             const Text(
               'Find cheaper groceries',
               style: TextStyle(
                 fontSize: 28,
-                fontWeight:
-                FontWeight.bold,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 6),
@@ -208,45 +261,32 @@ class _CustomerHomeState
             ),
             const SizedBox(height: 24),
             TextField(
-              controller:
-              searchController,
-              textInputAction:
-              TextInputAction.search,
-              onSubmitted: (_) =>
-                  searchProduct(),
+              controller: searchController,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => searchProduct(),
               decoration: InputDecoration(
-                hintText:
-                'Search product name...',
-                prefixIcon:
-                const Icon(
+                hintText: 'Search product name...',
+                prefixIcon: const Icon(
                   Icons.search,
                 ),
-                suffixIcon:
-                IconButton(
+                suffixIcon: IconButton(
                   tooltip: 'Search',
                   icon: const Icon(
                     Icons.arrow_forward,
                   ),
-                  onPressed:
-                  searchProduct,
+                  onPressed: searchProduct,
                 ),
                 filled: true,
-                fillColor:
-                Colors.white,
-                contentPadding:
-                const EdgeInsets
-                    .symmetric(
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(
                   horizontal: 18,
                   vertical: 18,
                 ),
-                border:
-                OutlineInputBorder(
-                  borderRadius:
-                  BorderRadius.circular(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(
                     16,
                   ),
-                  borderSide:
-                  BorderSide.none,
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
@@ -255,8 +295,7 @@ class _CustomerHomeState
               'Shop by Category',
               style: TextStyle(
                 fontSize: 22,
-                fontWeight:
-                FontWeight.bold,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 6),
@@ -269,17 +308,14 @@ class _CustomerHomeState
             const SizedBox(height: 16),
             if (isLoading)
               const Padding(
-                padding:
-                EdgeInsets.all(40),
+                padding: EdgeInsets.all(40),
                 child: Center(
-                  child:
-                  CircularProgressIndicator(),
+                  child: CircularProgressIndicator(),
                 ),
               )
             else if (itemGroups.isEmpty)
               const Padding(
-                padding:
-                EdgeInsets.all(40),
+                padding: EdgeInsets.all(40),
                 child: Center(
                   child: Text(
                     'No categories found',
@@ -289,66 +325,48 @@ class _CustomerHomeState
             else
               GridView.builder(
                 shrinkWrap: true,
-                physics:
-                const NeverScrollableScrollPhysics(),
-                itemCount:
-                itemGroups.length,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: itemGroups.length,
                 gridDelegate:
                 const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent:
-                  280,
+                  maxCrossAxisExtent: 280,
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 14,
-                  childAspectRatio:
-                  1.10,
+                  childAspectRatio: 1.10,
                 ),
-                itemBuilder:
-                    (context, index) {
-                  final originalGroup =
-                  itemGroups[index];
-
+                itemBuilder: (context, index) {
+                  final originalGroup = itemGroups[index];
 
                   return InkWell(
-                    borderRadius:
-                    BorderRadius.circular(
+                    borderRadius: BorderRadius.circular(
                       18,
                     ),
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder:
-                              (context) =>
-                              SubcategoryScreen(
-                                itemGroup:
-                                originalGroup,
-                              ),
+                          builder: (context) => SubcategoryScreen(
+                            itemGroup: originalGroup,
+                          ),
                         ),
                       );
                     },
                     child: Container(
-                      padding:
-                      const EdgeInsets
-                          .all(18),
-                      decoration:
-                      BoxDecoration(
-                        color:
-                        Colors.white,
-                        borderRadius:
-                        BorderRadius
-                            .circular(
+                      padding: const EdgeInsets.all(
+                        18,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(
                           18,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors
-                                .black
-                                .withValues(
+                            color: Colors.black.withValues(
                               alpha: 0.04,
                             ),
                             blurRadius: 8,
-                            offset:
-                            const Offset(
+                            offset: const Offset(
                               0,
                               3,
                             ),
@@ -356,22 +374,16 @@ class _CustomerHomeState
                         ],
                       ),
                       child: Column(
-                        mainAxisAlignment:
-                        MainAxisAlignment
-                            .center,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
                             width: 58,
                             height: 58,
-                            decoration:
-                            BoxDecoration(
-                              color:
-                              const Color(
+                            decoration: BoxDecoration(
+                              color: const Color(
                                 0xFFE7F8EC,
                               ),
-                              borderRadius:
-                              BorderRadius
-                                  .circular(
+                              borderRadius: BorderRadius.circular(
                                 16,
                               ),
                             ),
@@ -379,8 +391,7 @@ class _CustomerHomeState
                               getGroupIcon(
                                 originalGroup,
                               ),
-                              color:
-                              const Color(
+                              color: const Color(
                                 0xFF38BB62,
                               ),
                               size: 30,
@@ -391,19 +402,12 @@ class _CustomerHomeState
                           ),
                           Text(
                             originalGroup,
-                            textAlign:
-                            TextAlign
-                                .center,
+                            textAlign: TextAlign.center,
                             maxLines: 2,
-                            overflow:
-                            TextOverflow
-                                .ellipsis,
-                            style:
-                            const TextStyle(
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
                               fontSize: 15,
-                              fontWeight:
-                              FontWeight
-                                  .w600,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
