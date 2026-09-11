@@ -18,33 +18,25 @@ class _SellerRegisterScreenState
     extends State<SellerRegisterScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _nameController =
-  TextEditingController();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _premiseCodeController = TextEditingController();
+  final _shopNameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
-  final _emailController =
-  TextEditingController();
-
-  final _phoneController =
-  TextEditingController();
-
-  final _premiseCodeController =
-  TextEditingController();
-
-  final _shopNameController =
-  TextEditingController();
-
-  final _passwordController =
-  TextEditingController();
-
-  final _confirmPasswordController =
-  TextEditingController();
-
-  final DataGovService _dataGovService =
-  DataGovService();
+  final DataGovService _dataGovService = DataGovService();
 
   bool _isRegistering = false;
+  bool _isVerifyingPremise = false;
+  bool _premiseVerified = false;
+
   bool _hidePassword = true;
   bool _hideConfirmPassword = true;
+
+  Map<String, dynamic>? _verifiedPremise;
+  String? _premiseError;
 
   @override
   void initState() {
@@ -53,38 +45,22 @@ class _SellerRegisterScreenState
   }
 
   Future<void> _loadDraft() async {
-    final prefs =
-    await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
 
     _nameController.text =
-        prefs.getString(
-          'seller_name',
-        ) ??
-            '';
+        prefs.getString('seller_name') ?? '';
 
     _emailController.text =
-        prefs.getString(
-          'seller_email',
-        ) ??
-            '';
+        prefs.getString('seller_email') ?? '';
 
     _phoneController.text =
-        prefs.getString(
-          'seller_phone',
-        ) ??
-            '';
+        prefs.getString('seller_phone') ?? '';
 
     _premiseCodeController.text =
-        prefs.getString(
-          'seller_premise_code',
-        ) ??
-            '';
+        prefs.getString('seller_premise_code') ?? '';
 
     _shopNameController.text =
-        prefs.getString(
-          'seller_shop_name',
-        ) ??
-            '';
+        prefs.getString('seller_shop_name') ?? '';
 
     if (mounted) {
       setState(() {});
@@ -92,8 +68,7 @@ class _SellerRegisterScreenState
   }
 
   Future<void> _saveDraft() async {
-    final prefs =
-    await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
 
     await prefs.setString(
       'seller_name',
@@ -122,52 +97,131 @@ class _SellerRegisterScreenState
   }
 
   Future<void> _clearDraft() async {
-    final prefs =
-    await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
 
-    await prefs.remove(
-      'seller_name',
-    );
-
-    await prefs.remove(
-      'seller_email',
-    );
-
-    await prefs.remove(
-      'seller_phone',
-    );
-
-    await prefs.remove(
-      'seller_premise_code',
-    );
-
-    await prefs.remove(
-      'seller_shop_name',
-    );
+    await prefs.remove('seller_name');
+    await prefs.remove('seller_email');
+    await prefs.remove('seller_phone');
+    await prefs.remove('seller_premise_code');
+    await prefs.remove('seller_shop_name');
   }
 
-  Future<Map<String, dynamic>?>
-  _validatePremise() async {
-    final premiseCode =
-    int.tryParse(
+  void _onPremiseChanged() {
+    if (_premiseVerified ||
+        _premiseError != null) {
+      setState(() {
+        _premiseVerified = false;
+        _verifiedPremise = null;
+        _premiseError = null;
+
+        _passwordController.clear();
+        _confirmPasswordController.clear();
+      });
+    }
+
+    _saveDraft();
+  }
+
+  Future<void> _verifyPremise() async {
+    final premiseCode = int.tryParse(
       _premiseCodeController.text.trim(),
     );
 
     final shopName =
     _shopNameController.text.trim();
 
-    if (premiseCode == null ||
-        shopName.isEmpty) {
-      return null;
+    if (premiseCode == null) {
+      setState(() {
+        _premiseVerified = false;
+        _verifiedPremise = null;
+        _premiseError =
+        'Please enter a valid Premise Code.';
+      });
+
+      return;
     }
 
-    return _dataGovService.findPremise(
-      premiseCode: premiseCode,
-      shopName: shopName,
-    );
+    if (shopName.isEmpty) {
+      setState(() {
+        _premiseVerified = false;
+        _verifiedPremise = null;
+        _premiseError =
+        'Please enter your Shop Name.';
+      });
+
+      return;
+    }
+
+    setState(() {
+      _isVerifyingPremise = true;
+      _premiseVerified = false;
+      _verifiedPremise = null;
+      _premiseError = null;
+    });
+
+    try {
+      final premise =
+      await _dataGovService.findPremise(
+        premiseCode: premiseCode,
+        shopName: shopName,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (premise == null) {
+        setState(() {
+          _premiseVerified = false;
+          _verifiedPremise = null;
+          _premiseError =
+          'The Premise Code and Shop Name do not match the latest government data. Please check your details and try again.';
+        });
+
+        return;
+      }
+
+      setState(() {
+        _premiseVerified = true;
+        _verifiedPremise = premise;
+        _premiseError = null;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _premiseVerified = false;
+        _verifiedPremise = null;
+        _premiseError =
+        'We could not check your shop details right now. Please check your internet connection and try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isVerifyingPremise = false;
+        });
+      }
+    }
   }
 
   Future<void> _register() async {
+    if (!_premiseVerified ||
+        _verifiedPremise == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please verify your shop details before creating your account.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -177,35 +231,11 @@ class _SellerRegisterScreenState
     });
 
     try {
-      final premise =
-      await _validatePremise();
-
-      if (!mounted) {
-        return;
-      }
-
-      if (premise == null) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Premise code and shop name do not match the latest data.gov.my PriceCatcher premise data. Seller account cannot be created.',
-            ),
-            backgroundColor: Colors.red,
-            duration: Duration(
-              seconds: 5,
-            ),
-          ),
-        );
-
-        return;
-      }
-
       final supabase =
           Supabase.instance.client;
 
       final premiseCode =
-      premise['premise_code'];
+      _verifiedPremise!['premise_code'];
 
       final parsedPremiseCode =
       premiseCode is int
@@ -233,8 +263,7 @@ class _SellerRegisterScreenState
           _nameController.text.trim(),
           'phone':
           _phoneController.text.trim(),
-          'role':
-          'seller',
+          'role': 'seller',
           'premise_code':
           parsedPremiseCode,
         },
@@ -252,14 +281,12 @@ class _SellerRegisterScreenState
       await supabase
           .from('user')
           .insert({
-        'id':
-        user.id,
+        'id': user.id,
         'full_name':
         _nameController.text.trim(),
         'phone':
         _phoneController.text.trim(),
-        'role':
-        'seller',
+        'role': 'seller',
         'premise_code':
         parsedPremiseCode,
       });
@@ -277,9 +304,7 @@ class _SellerRegisterScreenState
             'Seller account created successfully. Please log in.',
           ),
           backgroundColor:
-          Color(
-            0xFF38BB62,
-          ),
+          Color(0xFF38BB62),
         ),
       );
 
@@ -296,28 +321,21 @@ class _SellerRegisterScreenState
         return;
       }
 
-      String message =
-          error.message;
+      String message = error.message;
 
       if (message
           .toLowerCase()
-          .contains(
-        'security purposes',
-      )) {
+          .contains('security purposes')) {
         message =
         'Please wait a moment before trying again.';
       } else if (message
           .toLowerCase()
-          .contains(
-        'already registered',
-      )) {
+          .contains('already registered')) {
         message =
         'This email is already registered.';
       } else if (message
           .toLowerCase()
-          .contains(
-        'invalid email',
-      )) {
+          .contains('invalid email')) {
         message =
         'Please enter a valid email address.';
       }
@@ -325,9 +343,7 @@ class _SellerRegisterScreenState
       ScaffoldMessenger.of(context)
           .showSnackBar(
         SnackBar(
-          content: Text(
-            message,
-          ),
+          content: Text(message),
           backgroundColor:
           Colors.red,
         ),
@@ -347,26 +363,16 @@ class _SellerRegisterScreenState
           Colors.red,
         ),
       );
-    } catch (error) {
-      debugPrint(
-        'SELLER REGISTER ERROR: $error',
-      );
-
+    } catch (e) {
       if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(context)
           .showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            error
-                .toString()
-                .contains(
-              'latest premise data',
-            )
-                ? 'Unable to get the latest premise data from data.gov.my. Please check your internet connection and try again.'
-                : 'Registration failed. Please try again.',
+            'Unable to create your account. Please try again.',
           ),
           backgroundColor:
           Colors.red,
@@ -386,25 +392,134 @@ class _SellerRegisterScreenState
     required IconData icon,
     String? hint,
     Widget? suffixIcon,
+    bool enabled = true,
   }) {
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      prefixIcon: Icon(
-        icon,
-      ),
+      prefixIcon: Icon(icon),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor:
-      const Color(
-        0xFFF7F7F7,
-      ),
-      border:
-      OutlineInputBorder(
+      fillColor: enabled
+          ? const Color(0xFFF7F7F7)
+          : const Color(0xFFE9E9E9),
+      border: OutlineInputBorder(
         borderRadius:
-        BorderRadius.circular(
-          12,
+        BorderRadius.circular(12),
+      ),
+    );
+  }
+
+  Widget _buildVerificationStatus() {
+    if (_premiseVerified) {
+      return Container(
+        width: double.infinity,
+        padding:
+        const EdgeInsets.all(14),
+        decoration:
+        BoxDecoration(
+          color:
+          const Color(0xFFE8F8ED),
+          borderRadius:
+          BorderRadius.circular(12),
         ),
+        child:
+        const Row(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons
+                  .check_circle_outline,
+              color:
+              Color(0xFF38BB62),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Shop Verified\n'
+                    'Your Premise Code and Shop Name match the latest government data. You can now create your password.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_premiseError != null) {
+      return Container(
+        width: double.infinity,
+        padding:
+        const EdgeInsets.all(14),
+        decoration:
+        BoxDecoration(
+          color:
+          const Color(0xFFFFEBEE),
+          borderRadius:
+          BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              color: Colors.red,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _premiseError!,
+                style:
+                const TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding:
+      const EdgeInsets.all(14),
+      decoration:
+      BoxDecoration(
+        color:
+        const Color(0xFFE8F8ED),
+        borderRadius:
+        BorderRadius.circular(12),
+      ),
+      child:
+      const Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons
+                .storefront_outlined,
+            color:
+            Color(0xFF38BB62),
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Verify Your Shop\n'
+                  'Enter your Premise Code and Shop Name, then verify them with the latest government data before creating your account.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -427,21 +542,16 @@ class _SellerRegisterScreenState
       BuildContext context,
       ) {
     return Scaffold(
-      backgroundColor:
-      Colors.white,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor:
-        Colors.white,
-        surfaceTintColor:
-        Colors.white,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
         elevation: 0,
         title: const Text(
           'Seller Registration',
           style: TextStyle(
             color:
-            Color(
-              0xFF333632,
-            ),
+            Color(0xFF333632),
             fontWeight:
             FontWeight.w600,
           ),
@@ -449,7 +559,8 @@ class _SellerRegisterScreenState
       ),
       body: SafeArea(
         child: LayoutBuilder(
-          builder: (
+          builder:
+              (
               context,
               constraints,
               ) {
@@ -463,80 +574,26 @@ class _SellerRegisterScreenState
                 horizontal:
                 isLandscape
                     ? 100
-                    : 28,
-                vertical:
-                30,
+                    : 24,
+                vertical: 24,
               ),
               child: Center(
                 child: ConstrainedBox(
                   constraints:
                   const BoxConstraints(
-                    maxWidth:
-                    500,
+                    maxWidth: 500,
                   ),
                   child: Form(
-                    key:
-                    _formKey,
+                    key: _formKey,
                     child: Column(
                       crossAxisAlignment:
                       CrossAxisAlignment.stretch,
                       children: [
-                        const Icon(
-                          Icons
-                              .storefront_outlined,
-                          size:
-                          70,
-                          color:
-                          Color(
-                            0xFF38BB62,
-                          ),
-                        ),
-                        const SizedBox(
-                          height:
-                          20,
-                        ),
-                        const Text(
-                          'Create Seller Account',
-                          textAlign:
-                          TextAlign.center,
-                          style:
-                          TextStyle(
-                            fontSize:
-                            26,
-                            fontWeight:
-                            FontWeight.bold,
-                            color:
-                            Color(
-                              0xFF333632,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(
-                          height:
-                          8,
-                        ),
-                        const Text(
-                          'Register your shop using the latest PriceCatcher premise data.',
-                          textAlign:
-                          TextAlign.center,
-                          style:
-                          TextStyle(
-                            fontSize:
-                            14,
-                            color:
-                            Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(
-                          height:
-                          30,
-                        ),
                         TextFormField(
                           controller:
                           _nameController,
                           onChanged:
-                              (_) =>
-                              _saveDraft(),
+                              (_) => _saveDraft(),
                           textInputAction:
                           TextInputAction.next,
                           decoration:
@@ -560,17 +617,16 @@ class _SellerRegisterScreenState
                           },
                         ),
                         const SizedBox(
-                          height:
-                          16,
+                          height: 14,
                         ),
                         TextFormField(
                           controller:
                           _emailController,
                           onChanged:
-                              (_) =>
-                              _saveDraft(),
+                              (_) => _saveDraft(),
                           keyboardType:
-                          TextInputType.emailAddress,
+                          TextInputType
+                              .emailAddress,
                           textInputAction:
                           TextInputAction.next,
                           decoration:
@@ -593,15 +649,9 @@ class _SellerRegisterScreenState
                             final email =
                             value.trim();
 
-                            final regex =
-                            RegExp(
+                            if (!RegExp(
                               r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                            );
-
-                            if (!regex
-                                .hasMatch(
-                              email,
-                            )) {
+                            ).hasMatch(email)) {
                               return 'Please enter a valid email';
                             }
 
@@ -609,15 +659,13 @@ class _SellerRegisterScreenState
                           },
                         ),
                         const SizedBox(
-                          height:
-                          16,
+                          height: 14,
                         ),
                         TextFormField(
                           controller:
                           _phoneController,
                           onChanged:
-                              (_) =>
-                              _saveDraft(),
+                              (_) => _saveDraft(),
                           keyboardType:
                           TextInputType.phone,
                           textInputAction:
@@ -648,13 +696,10 @@ class _SellerRegisterScreenState
                               return 'Please enter your phone number';
                             }
 
-                            final phone =
-                            value.trim();
-
                             if (!RegExp(
                               r'^01[0-9]{8,9}$',
                             ).hasMatch(
-                              phone,
+                              value.trim(),
                             )) {
                               return 'Please enter a valid Malaysian phone number';
                             }
@@ -663,15 +708,14 @@ class _SellerRegisterScreenState
                           },
                         ),
                         const SizedBox(
-                          height:
-                          16,
+                          height: 14,
                         ),
                         TextFormField(
                           controller:
                           _premiseCodeController,
                           onChanged:
                               (_) =>
-                              _saveDraft(),
+                              _onPremiseChanged(),
                           keyboardType:
                           TextInputType.number,
                           textInputAction:
@@ -685,10 +729,9 @@ class _SellerRegisterScreenState
                             label:
                             'Premise Code',
                             hint:
-                            'Enter PriceCatcher premise code',
+                            'Enter Premise Code',
                             icon:
-                            Icons
-                                .pin_outlined,
+                            Icons.pin_outlined,
                           ),
                           validator:
                               (value) {
@@ -699,34 +742,26 @@ class _SellerRegisterScreenState
                               return 'Please enter your premise code';
                             }
 
-                            if (int.tryParse(
-                              value.trim(),
-                            ) ==
-                                null) {
-                              return 'Premise code must contain numbers only';
-                            }
-
                             return null;
                           },
                         ),
                         const SizedBox(
-                          height:
-                          16,
+                          height: 14,
                         ),
                         TextFormField(
                           controller:
                           _shopNameController,
                           onChanged:
                               (_) =>
-                              _saveDraft(),
+                              _onPremiseChanged(),
                           textInputAction:
-                          TextInputAction.next,
+                          TextInputAction.done,
                           decoration:
                           _decoration(
                             label:
                             'Shop Name',
                             hint:
-                            'Enter shop name exactly as registered',
+                            'Enter Shop Name',
                             icon:
                             Icons
                                 .store_outlined,
@@ -744,58 +779,49 @@ class _SellerRegisterScreenState
                           },
                         ),
                         const SizedBox(
-                          height:
-                          12,
+                          height: 12,
                         ),
-                        Container(
-                          padding:
-                          const EdgeInsets.all(
-                            12,
-                          ),
-                          decoration:
-                          BoxDecoration(
-                            color:
-                            const Color(
-                              0xFFE8F8ED,
-                            ),
-                            borderRadius:
-                            BorderRadius.circular(
-                              10,
-                            ),
-                          ),
+                        SizedBox(
+                          height: 48,
                           child:
-                          const Row(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                Icons
-                                    .cloud_download_outlined,
-                                color:
-                                Color(
-                                  0xFF38BB62,
-                                ),
+                          OutlinedButton.icon(
+                            onPressed:
+                            _isVerifyingPremise
+                                ? null
+                                : _verifyPremise,
+                            icon:
+                            _isVerifyingPremise
+                                ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child:
+                              CircularProgressIndicator(
+                                strokeWidth: 2,
                               ),
-                              SizedBox(
-                                width:
-                                10,
-                              ),
-                              Expanded(
-                                child:
-                                Text(
-                                  'Premise information will be checked against the latest data from data.gov.my when you register.',
-                                ),
-                              ),
-                            ],
+                            )
+                                : const Icon(
+                              Icons
+                                  .verified_outlined,
+                            ),
+                            label: Text(
+                              _isVerifyingPremise
+                                  ? 'VERIFYING...'
+                                  : 'VERIFY SHOP',
+                            ),
                           ),
                         ),
                         const SizedBox(
-                          height:
-                          16,
+                          height: 12,
+                        ),
+                        _buildVerificationStatus(),
+                        const SizedBox(
+                          height: 16,
                         ),
                         TextFormField(
                           controller:
                           _passwordController,
+                          enabled:
+                          _premiseVerified,
                           obscureText:
                           _hidePassword,
                           textInputAction:
@@ -805,37 +831,38 @@ class _SellerRegisterScreenState
                             label:
                             'Password',
                             icon:
-                            Icons
-                                .lock_outline,
+                            Icons.lock_outline,
+                            enabled:
+                            _premiseVerified,
                             suffixIcon:
-                            IconButton(
+                            _premiseVerified
+                                ? IconButton(
                               onPressed:
                                   () {
-                                setState(() {
-                                  _hidePassword =
-                                  !_hidePassword;
-                                });
+                                setState(
+                                      () {
+                                    _hidePassword =
+                                    !_hidePassword;
+                                  },
+                                );
                               },
-                              icon:
-                              Icon(
+                              icon: Icon(
                                 _hidePassword
-                                    ? Icons
-                                    .visibility_outlined
-                                    : Icons
-                                    .visibility_off_outlined,
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
                               ),
-                            ),
+                            )
+                                : null,
                           ),
                           validator:
                               (value) {
+                            if (!_premiseVerified) {
+                              return null;
+                            }
+
                             if (value == null ||
                                 value.isEmpty) {
-                              return 'Password requirements:\n'
-                                  '• At least 8 characters\n'
-                                  '• At least 1 uppercase letter\n'
-                                  '• At least 1 lowercase letter\n'
-                                  '• At least 1 number\n'
-                                  '• At least 1 special character';
+                              return 'Please enter a password';
                             }
 
                             final valid =
@@ -862,24 +889,20 @@ class _SellerRegisterScreenState
                                     );
 
                             if (!valid) {
-                              return 'Password requirements:\n'
-                                  '• At least 8 characters\n'
-                                  '• At least 1 uppercase letter\n'
-                                  '• At least 1 lowercase letter\n'
-                                  '• At least 1 number\n'
-                                  '• At least 1 special character';
+                              return 'Password must have at least 8 characters, uppercase, lowercase, number and special character';
                             }
 
                             return null;
                           },
                         ),
                         const SizedBox(
-                          height:
-                          16,
+                          height: 14,
                         ),
                         TextFormField(
                           controller:
                           _confirmPasswordController,
+                          enabled:
+                          _premiseVerified,
                           obscureText:
                           _hideConfirmPassword,
                           textInputAction:
@@ -889,36 +912,43 @@ class _SellerRegisterScreenState
                             label:
                             'Confirm Password',
                             icon:
-                            Icons
-                                .lock_outline,
+                            Icons.lock_outline,
+                            enabled:
+                            _premiseVerified,
                             suffixIcon:
-                            IconButton(
+                            _premiseVerified
+                                ? IconButton(
                               onPressed:
                                   () {
-                                setState(() {
-                                  _hideConfirmPassword =
-                                  !_hideConfirmPassword;
-                                });
+                                setState(
+                                      () {
+                                    _hideConfirmPassword =
+                                    !_hideConfirmPassword;
+                                  },
+                                );
                               },
-                              icon:
-                              Icon(
+                              icon: Icon(
                                 _hideConfirmPassword
-                                    ? Icons
-                                    .visibility_outlined
-                                    : Icons
-                                    .visibility_off_outlined,
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
                               ),
-                            ),
+                            )
+                                : null,
                           ),
                           validator:
                               (value) {
+                            if (!_premiseVerified) {
+                              return null;
+                            }
+
                             if (value == null ||
                                 value.isEmpty) {
                               return 'Please confirm your password';
                             }
 
                             if (value !=
-                                _passwordController.text) {
+                                _passwordController
+                                    .text) {
                               return 'Passwords do not match';
                             }
 
@@ -926,35 +956,32 @@ class _SellerRegisterScreenState
                           },
                           onFieldSubmitted:
                               (_) {
-                            if (!_isRegistering) {
+                            if (_premiseVerified &&
+                                !_isRegistering) {
                               _register();
                             }
                           },
                         ),
                         const SizedBox(
-                          height:
-                          28,
+                          height: 24,
                         ),
                         SizedBox(
-                          height:
-                          55,
+                          height: 55,
                           child:
                           FilledButton(
                             onPressed:
-                            _isRegistering
+                            _isRegistering ||
+                                !_premiseVerified
                                 ? null
                                 : _register,
                             child:
                             _isRegistering
                                 ? const SizedBox(
-                              width:
-                              22,
-                              height:
-                              22,
+                              width: 22,
+                              height: 22,
                               child:
                               CircularProgressIndicator(
-                                strokeWidth:
-                                2,
+                                strokeWidth: 2,
                                 color:
                                 Colors.white,
                               ),
@@ -963,8 +990,7 @@ class _SellerRegisterScreenState
                               'REGISTER AS SELLER',
                               style:
                               TextStyle(
-                                fontSize:
-                                16,
+                                fontSize: 16,
                                 fontWeight:
                                 FontWeight.w600,
                               ),
@@ -972,8 +998,7 @@ class _SellerRegisterScreenState
                           ),
                         ),
                         const SizedBox(
-                          height:
-                          15,
+                          height: 14,
                         ),
                         TextButton(
                           onPressed:

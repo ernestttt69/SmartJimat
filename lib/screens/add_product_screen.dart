@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/data_gov_service.dart';
 import '../services/product_service.dart';
@@ -51,24 +50,15 @@ class _AddProductScreenState
   final FocusNode _productNameFocusNode =
   FocusNode();
 
-  List<Map<String, dynamic>> _items =
-  [];
-
-  final List<File> _selectedImages =
-  [];
+  List<Map<String, dynamic>> _items = [];
+  final List<File> _selectedImages = [];
 
   int? _matchedItemCode;
-  int? _sellerPremiseCode;
-
   String? _matchedItemGroup;
-
-  Map<String, dynamic>?
-  _priceCatcherPrice;
 
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isCheckingProduct = false;
-  bool _isLoadingPrice = false;
 
   bool _productChecked = false;
   bool _productMatched = false;
@@ -86,57 +76,16 @@ class _AddProductScreenState
       _onProductNameChanged,
     );
 
-    _loadLatestData();
+    _loadLatestItems();
   }
 
-  Future<void> _loadLatestData() async {
+  Future<void> _loadLatestItems() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final currentUser =
-          Supabase
-              .instance
-              .client
-              .auth
-              .currentUser;
-
-      if (currentUser == null) {
-        throw Exception(
-          'User is not logged in.',
-        );
-      }
-
-      final profile =
-      await Supabase.instance.client
-          .from('user')
-          .select(
-        'premise_code',
-      )
-          .eq(
-        'id',
-        currentUser.id,
-      )
-          .single();
-
-      final premiseCode =
-      profile['premise_code'];
-
-      final parsedPremiseCode =
-      premiseCode is int
-          ? premiseCode
-          : int.tryParse(
-        premiseCode.toString(),
-      );
-
-      if (parsedPremiseCode == null) {
-        throw Exception(
-          'Seller premise code is not available.',
-        );
-      }
-
-      final latestItems =
+      final items =
       await _dataGovService
           .getLatestItems();
 
@@ -145,14 +94,8 @@ class _AddProductScreenState
       }
 
       setState(() {
-        _sellerPremiseCode =
-            parsedPremiseCode;
-
-        _items =
-            latestItems;
-
-        _isLoading =
-        false;
+        _items = items;
+        _isLoading = false;
       });
     } catch (e) {
       if (!mounted) {
@@ -163,44 +106,26 @@ class _AddProductScreenState
         _isLoading = false;
       });
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to get the latest PriceCatcher data: $e',
-          ),
-          backgroundColor:
-          Colors.red,
-        ),
+      _showMessage(
+        'We could not get the latest government product data. Please check your internet connection and tap refresh.',
       );
     }
   }
 
   void _onProductNameChanged() {
     if (!_productChecked &&
-        !_productMatched &&
-        _priceCatcherPrice == null) {
+        !_productMatched) {
       return;
     }
 
     setState(() {
-      _matchedItemCode =
-      null;
+      _matchedItemCode = null;
+      _matchedItemGroup = null;
 
-      _matchedItemGroup =
-      null;
-
-      _productChecked =
-      false;
-
-      _productMatched =
-      false;
-
-      _priceCatcherPrice =
-      null;
+      _productChecked = false;
+      _productMatched = false;
 
       _unitController.clear();
-
       _categoryController.clear();
     });
   }
@@ -212,9 +137,7 @@ class _AddProductScreenState
         .trim()
         .toLowerCase()
         .replaceAll(
-      RegExp(
-        r'\s+',
-      ),
+      RegExp(r'\s+'),
       ' ',
     );
   }
@@ -251,20 +174,15 @@ class _AddProductScreenState
       return;
     }
 
-    _productNameController
-        .removeListener(
+    _productNameController.removeListener(
       _onProductNameChanged,
     );
 
     setState(() {
-      _productChecked =
-      true;
+      _productChecked = true;
+      _productMatched = true;
 
-      _productMatched =
-      true;
-
-      _matchedItemCode =
-          itemCode;
+      _matchedItemCode = itemCode;
 
       _matchedItemGroup =
           item['item_group']
@@ -284,80 +202,13 @@ class _AddProductScreenState
           item['item_category']
               ?.toString() ??
               '';
-
-      _priceCatcherPrice =
-      null;
     });
 
-    _productNameController
-        .addListener(
+    _productNameController.addListener(
       _onProductNameChanged,
     );
 
-    _productNameFocusNode
-        .unfocus();
-
-    await _loadLatestItemPrice(
-      itemCode,
-    );
-  }
-
-  Future<void> _loadLatestItemPrice(
-      int itemCode,
-      ) async {
-    if (_sellerPremiseCode == null) {
-      return;
-    }
-
-    setState(() {
-      _isLoadingPrice =
-      true;
-
-      _priceCatcherPrice =
-      null;
-    });
-
-    try {
-      final price =
-      await _dataGovService
-          .getLatestItemPriceAtPremise(
-        itemCode:
-        itemCode,
-        premiseCode:
-        _sellerPremiseCode!,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _priceCatcherPrice =
-            price;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to get latest PriceCatcher price: $e',
-          ),
-          backgroundColor:
-          Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingPrice =
-          false;
-        });
-      }
-    }
+    _productNameFocusNode.unfocus();
   }
 
   Future<void> _checkProduct() async {
@@ -366,7 +217,7 @@ class _AddProductScreenState
 
     if (productName.isEmpty) {
       _showMessage(
-        'Please enter a product name.',
+        'Please enter a product name first.',
       );
 
       return;
@@ -374,19 +225,18 @@ class _AddProductScreenState
 
     if (_items.isEmpty) {
       _showMessage(
-        'Latest PriceCatcher item data is not available.',
+        'Government product data is unavailable. Please tap refresh and try again.',
       );
 
       return;
     }
 
     setState(() {
-      _isCheckingProduct =
-      true;
+      _isCheckingProduct = true;
     });
 
     try {
-      final normalizedInput =
+      final input =
       _normalizeText(
         productName,
       );
@@ -401,8 +251,7 @@ class _AddProductScreenState
                 '',
           );
 
-          return name ==
-              normalizedInput;
+          return name == input;
         },
       ).toList();
 
@@ -412,23 +261,13 @@ class _AddProductScreenState
 
       if (matches.isEmpty) {
         setState(() {
-          _productChecked =
-          true;
+          _productChecked = true;
+          _productMatched = false;
 
-          _productMatched =
-          false;
-
-          _matchedItemCode =
-          null;
-
-          _matchedItemGroup =
-          null;
-
-          _priceCatcherPrice =
-          null;
+          _matchedItemCode = null;
+          _matchedItemGroup = null;
 
           _unitController.clear();
-
           _categoryController.clear();
         });
 
@@ -456,8 +295,7 @@ class _AddProductScreenState
     } finally {
       if (mounted) {
         setState(() {
-          _isCheckingProduct =
-          false;
+          _isCheckingProduct = false;
         });
       }
     }
@@ -469,14 +307,10 @@ class _AddProductScreenState
       ) async {
     return showModalBottomSheet<
         Map<String, dynamic>>(
-      context:
-      context,
-      backgroundColor:
-      Colors.white,
-      isScrollControlled:
-      true,
-      builder:
-          (context) {
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      builder: (context) {
         return SafeArea(
           child: Padding(
             padding:
@@ -485,25 +319,22 @@ class _AddProductScreenState
             ),
             child: SizedBox(
               height:
-              MediaQuery.of(
-                context,
-              ).size.height *
+              MediaQuery.of(context)
+                  .size
+                  .height *
                   0.55,
               child: Column(
                 children: [
                   const Text(
-                    'Select Matching Product',
-                    style:
-                    TextStyle(
-                      fontSize:
-                      21,
+                    'Select Product',
+                    style: TextStyle(
+                      fontSize: 20,
                       fontWeight:
                       FontWeight.bold,
                     ),
                   ),
                   const SizedBox(
-                    height:
-                    20,
+                    height: 15,
                   ),
                   Expanded(
                     child:
@@ -525,19 +356,16 @@ class _AddProductScreenState
                         matches[index];
 
                         return ListTile(
-                          title:
-                          Text(
+                          title: Text(
                             item['item']
                                 ?.toString() ??
                                 '',
                           ),
-                          subtitle:
-                          Text(
+                          subtitle: Text(
                             '${item['unit'] ?? ''}'
                                 '${item['item_category'] != null ? ' • ${item['item_category']}' : ''}',
                           ),
-                          onTap:
-                              () {
+                          onTap: () {
                             Navigator.pop(
                               context,
                               item,
@@ -559,7 +387,7 @@ class _AddProductScreenState
   Future<void> _pickImages() async {
     if (_selectedImages.length >= 5) {
       _showMessage(
-        'Maximum 5 images allowed.',
+        'You can upload a maximum of 5 images.',
       );
 
       return;
@@ -568,8 +396,7 @@ class _AddProductScreenState
     final images =
     await _imagePicker
         .pickMultiImage(
-      imageQuality:
-      80,
+      imageQuality: 80,
     );
 
     if (images.isEmpty) {
@@ -609,8 +436,7 @@ class _AddProductScreenState
       int index,
       ) {
     setState(() {
-      _selectedImages
-          .removeAt(
+      _selectedImages.removeAt(
         index,
       );
     });
@@ -633,7 +459,7 @@ class _AddProductScreenState
 
     if (productName.isEmpty) {
       _showMessage(
-        'Please enter the product name.',
+        'Please enter a product name.',
       );
 
       return;
@@ -641,7 +467,7 @@ class _AddProductScreenState
 
     if (!_productChecked) {
       _showMessage(
-        'Please check the product with PriceCatcher first.',
+        'Please check the product with government data first.',
       );
 
       return;
@@ -673,8 +499,7 @@ class _AddProductScreenState
     }
 
     setState(() {
-      _isSaving =
-      true;
+      _isSaving = true;
     });
 
     try {
@@ -700,9 +525,7 @@ class _AddProductScreenState
         );
 
         if (productId == null) {
-          throw Exception(
-            'Invalid existing product.',
-          );
+          throw Exception();
         }
 
         final currentPrice =
@@ -788,9 +611,7 @@ class _AddProductScreenState
       }
 
       _showMessage(
-        _productMatched
-            ? 'Product added and linked with PriceCatcher.'
-            : 'Custom product added successfully.',
+        'Product added successfully.',
         success:
         true,
       );
@@ -805,7 +626,7 @@ class _AddProductScreenState
       }
 
       _showMessage(
-        e.toString(),
+        'Unable to save the product. Please try again.',
       );
     } finally {
       if (mounted) {
@@ -838,17 +659,18 @@ class _AddProductScreenState
           content:
           Text(
             isDeleted
-                ? 'This product is in Deleted Products.\n\nPrevious price: RM ${currentPrice.toStringAsFixed(2)}\nNew price: RM ${newPrice.toStringAsFixed(2)}\n\nRestore and update it?'
-                : 'You already added this product.\n\nCurrent price: RM ${currentPrice.toStringAsFixed(2)}\nNew price: RM ${newPrice.toStringAsFixed(2)}\n\nUpdate the existing product?',
+                ? 'This product is in Deleted Products.\n\nPrevious Price: RM ${currentPrice.toStringAsFixed(2)}\nNew Price: RM ${newPrice.toStringAsFixed(2)}\n\nRestore and update it?'
+                : 'You already added this product.\n\nCurrent Price: RM ${currentPrice.toStringAsFixed(2)}\nNew Price: RM ${newPrice.toStringAsFixed(2)}\n\nUpdate the existing product?',
           ),
           actions: [
             TextButton(
               onPressed:
-                  () =>
-                  Navigator.pop(
-                    context,
-                    false,
-                  ),
+                  () {
+                Navigator.pop(
+                  context,
+                  false,
+                );
+              },
               child:
               const Text(
                 'CANCEL',
@@ -856,11 +678,12 @@ class _AddProductScreenState
             ),
             FilledButton(
               onPressed:
-                  () =>
-                  Navigator.pop(
-                    context,
-                    true,
-                  ),
+                  () {
+                Navigator.pop(
+                  context,
+                  true,
+                );
+              },
               child:
               Text(
                 isDeleted
@@ -873,45 +696,30 @@ class _AddProductScreenState
       },
     );
 
-    return result ??
-        false;
+    return result ?? false;
   }
 
   void _resetForm() {
-    _productNameController
-        .removeListener(
+    _productNameController.removeListener(
       _onProductNameChanged,
     );
 
     setState(() {
-      _matchedItemCode =
-      null;
+      _matchedItemCode = null;
+      _matchedItemGroup = null;
 
-      _matchedItemGroup =
-      null;
-
-      _productChecked =
-      false;
-
-      _productMatched =
-      false;
-
-      _priceCatcherPrice =
-      null;
+      _productChecked = false;
+      _productMatched = false;
 
       _productNameController.clear();
-
       _unitController.clear();
-
       _categoryController.clear();
-
       _priceController.clear();
 
       _selectedImages.clear();
     });
 
-    _productNameController
-        .addListener(
+    _productNameController.addListener(
       _onProductNameChanged,
     );
   }
@@ -941,120 +749,13 @@ class _AddProductScreenState
     );
   }
 
-  Widget _buildPriceCatcherPrice() {
-    if (!_productMatched) {
-      return const SizedBox.shrink();
-    }
-
-    if (_isLoadingPrice) {
-      return Container(
-        width:
-        double.infinity,
-        padding:
-        const EdgeInsets.all(
-          16,
-        ),
-        decoration:
-        BoxDecoration(
-          color:
-          const Color(
-            0xFFF3F7F4,
-          ),
-          borderRadius:
-          BorderRadius.circular(
-            12,
-          ),
-        ),
-        child:
-        const Row(
-          children: [
-            SizedBox(
-              width:
-              22,
-              height:
-              22,
-              child:
-              CircularProgressIndicator(
-                strokeWidth:
-                2,
-              ),
-            ),
-            SizedBox(
-              width:
-              12,
-            ),
-            Expanded(
-              child:
-              Text(
-                'Getting latest PriceCatcher price from data.gov.my...',
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_priceCatcherPrice == null) {
-      return Container(
-        width:
-        double.infinity,
-        padding:
-        const EdgeInsets.all(
-          16,
-        ),
-        decoration:
-        BoxDecoration(
-          color:
-          const Color(
-            0xFFFFF7E6,
-          ),
-          borderRadius:
-          BorderRadius.circular(
-            12,
-          ),
-        ),
-        child:
-        const Row(
-          children: [
-            Icon(
-              Icons.info_outline,
-              color:
-              Color(
-                0xFFB87900,
-              ),
-            ),
-            SizedBox(
-              width:
-              10,
-            ),
-            Expanded(
-              child:
-              Text(
-                'No PriceCatcher price was found for this item at your premise in the latest available dataset.',
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final price =
-        (_priceCatcherPrice!['price']
-        as num?)
-            ?.toDouble() ??
-            0;
-
-    final date =
-        _priceCatcherPrice!['date']
-            ?.toString() ??
-            '-';
-
+  Widget _buildGovernmentInfo() {
     return Container(
       width:
       double.infinity,
       padding:
       const EdgeInsets.all(
-        16,
+        14,
       ),
       decoration:
       BoxDecoration(
@@ -1068,72 +769,33 @@ class _AddProductScreenState
         ),
       ),
       child:
-      Column(
+      const Row(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(
-                Icons
-                    .verified_outlined,
-                color:
-                Color(
-                  0xFF38BB62,
-                ),
-              ),
-              SizedBox(
-                width:
-                8,
-              ),
-              Text(
-                'Latest PriceCatcher Price',
-                style:
-                TextStyle(
-                  fontWeight:
-                  FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(
-            height:
-            10,
-          ),
-          Text(
-            'RM ${price.toStringAsFixed(2)}',
-            style:
-            const TextStyle(
-              fontSize:
-              24,
-              fontWeight:
-              FontWeight.bold,
-              color:
-              Color(
-                0xFF2E9F52,
-              ),
+          Icon(
+            Icons
+                .verified_outlined,
+            color:
+            Color(
+              0xFF38BB62,
             ),
           ),
-          const SizedBox(
-            height:
-            4,
+          SizedBox(
+            width:
+            10,
           ),
-          Text(
-            'Premise Code: ${_sellerPremiseCode ?? '-'}',
-          ),
-          Text(
-            'Price Date: $date',
-          ),
-          const SizedBox(
-            height:
-            5,
-          ),
-          const Text(
-            'Reference only. You can set your own selling price.',
-            style:
-            TextStyle(
-              color:
-              Colors.grey,
+          Expanded(
+            child: Text(
+              'Check Product Information\n'
+                  'Enter or select a product to check whether its information is available in the latest government data. If found, the Unit and Category will be filled in automatically.',
+              style:
+              TextStyle(
+                fontSize:
+                13,
+                height:
+                1.4,
+              ),
             ),
           ),
         ],
@@ -1168,8 +830,9 @@ class _AddProductScreenState
           12,
         ),
       ),
-      child:
-      Row(
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
           Icon(
             _productMatched
@@ -1190,11 +853,17 @@ class _AddProductScreenState
             10,
           ),
           Expanded(
-            child:
-            Text(
+            child: Text(
               _productMatched
-                  ? 'Product found in the latest PriceCatcher item data. Item Code: ${_matchedItemCode ?? '-'}'
-                  : 'Product was not found in the latest PriceCatcher item data. Enter unit and category manually.',
+                  ? 'Product Found\nThis product matches the latest government data. The Unit and Category have been filled in automatically.'
+                  : 'Product Not Found\nThis product is not listed in the latest government data. You can still add it by entering the Unit and Category yourself.',
+              style:
+              const TextStyle(
+                fontSize:
+                13,
+                height:
+                1.4,
+              ),
             ),
           ),
         ],
@@ -1270,9 +939,7 @@ class _AddProductScreenState
             return [
               ...starts,
               ...contains,
-            ].take(
-              8,
-            );
+            ].take(8);
           },
           onSelected:
               (item) {
@@ -1292,14 +959,12 @@ class _AddProductScreenState
               controller,
               focusNode:
               focusNode,
-              textCapitalization:
-              TextCapitalization.words,
               decoration:
               InputDecoration(
                 labelText:
                 'Product Name',
                 hintText:
-                'Enter product name',
+                'Enter Product Name',
                 prefixIcon:
                 const Icon(
                   Icons
@@ -1336,6 +1001,10 @@ class _AddProductScreenState
                 5,
                 color:
                 Colors.white,
+                borderRadius:
+                BorderRadius.circular(
+                  12,
+                ),
                 child: SizedBox(
                   width:
                   constraints.maxWidth,
@@ -1402,10 +1071,9 @@ class _AddProductScreenState
     );
   }
 
-  Widget _buildTextField({
+  Widget _buildField({
     required TextEditingController controller,
     required String label,
-    required String hint,
     required IconData icon,
     required bool enabled,
     bool readOnly = false,
@@ -1421,8 +1089,6 @@ class _AddProductScreenState
       InputDecoration(
         labelText:
         label,
-        hintText:
-        hint,
         prefixIcon:
         Icon(
           icon,
@@ -1451,9 +1117,10 @@ class _AddProductScreenState
       return GestureDetector(
         onTap:
         _pickImages,
-        child: Container(
+        child:
+        Container(
           height:
-          180,
+          150,
           width:
           double.infinity,
           decoration:
@@ -1462,7 +1129,7 @@ class _AddProductScreenState
             Colors.white,
             borderRadius:
             BorderRadius.circular(
-              14,
+              12,
             ),
             border:
             Border.all(
@@ -1479,7 +1146,7 @@ class _AddProductScreenState
                 Icons
                     .add_photo_alternate_outlined,
                 size:
-                50,
+                45,
                 color:
                 Color(
                   0xFF38BB62,
@@ -1487,7 +1154,7 @@ class _AddProductScreenState
               ),
               SizedBox(
                 height:
-                10,
+                8,
               ),
               Text(
                 'Select Product Images',
@@ -1510,7 +1177,7 @@ class _AddProductScreenState
       children: [
         SizedBox(
           height:
-          140,
+          130,
           child:
           ListView.separated(
             scrollDirection:
@@ -1543,25 +1210,26 @@ class _AddProductScreenState
                       _selectedImages[
                       index],
                       width:
-                      140,
+                      130,
                       height:
-                      140,
+                      130,
                       fit:
                       BoxFit.cover,
                     ),
                   ),
                   Positioned(
-                    top:
-                    4,
                     right:
+                    4,
+                    top:
                     4,
                     child:
                     IconButton(
                       onPressed:
-                          () =>
-                          _removeImage(
-                            index,
-                          ),
+                          () {
+                        _removeImage(
+                          index,
+                        );
+                      },
                       icon:
                       const Icon(
                         Icons.cancel,
@@ -1575,8 +1243,7 @@ class _AddProductScreenState
             },
           ),
         ),
-        if (_selectedImages.length <
-            5)
+        if (_selectedImages.length < 5)
           TextButton.icon(
             onPressed:
             _pickImages,
@@ -1596,19 +1263,14 @@ class _AddProductScreenState
 
   @override
   void dispose() {
-    _productNameController
-        .removeListener(
+    _productNameController.removeListener(
       _onProductNameChanged,
     );
 
     _productNameController.dispose();
-
     _unitController.dispose();
-
     _categoryController.dispose();
-
     _priceController.dispose();
-
     _productNameFocusNode.dispose();
 
     super.dispose();
@@ -1636,9 +1298,9 @@ class _AddProductScreenState
             onPressed:
             _isLoading
                 ? null
-                : _loadLatestData,
+                : _loadLatestItems,
             tooltip:
-            'Refresh latest data',
+            'Refresh latest government data',
             icon:
             const Icon(
               Icons.refresh,
@@ -1650,265 +1312,227 @@ class _AddProductScreenState
       _isLoading
           ? const Center(
         child:
-        Column(
-          mainAxisAlignment:
-          MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(
-              height:
-              15,
-            ),
-            Text(
-              'Getting latest PriceCatcher data from data.gov.my...',
-            ),
-          ],
-        ),
+        CircularProgressIndicator(),
       )
           : SafeArea(
         child:
-        RefreshIndicator(
-          onRefresh:
-          _loadLatestData,
+        SingleChildScrollView(
+          padding:
+          const EdgeInsets.all(
+            20,
+          ),
           child:
-          SingleChildScrollView(
-            physics:
-            const AlwaysScrollableScrollPhysics(),
-            padding:
-            const EdgeInsets.all(
-              20,
-            ),
-            child:
-            Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Product Images',
-                  style:
-                  TextStyle(
-                    fontSize:
-                    20,
-                    fontWeight:
-                    FontWeight.bold,
-                  ),
+          Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Product Images',
+                style:
+                TextStyle(
+                  fontSize:
+                  20,
+                  fontWeight:
+                  FontWeight.bold,
                 ),
-                const SizedBox(
-                  height:
-                  15,
+              ),
+              const SizedBox(
+                height:
+                14,
+              ),
+              _buildImages(),
+              const SizedBox(
+                height:
+                26,
+              ),
+              const Text(
+                'Product Information',
+                style:
+                TextStyle(
+                  fontSize:
+                  20,
+                  fontWeight:
+                  FontWeight.bold,
                 ),
-                _buildImages(),
-                const SizedBox(
-                  height:
-                  30,
-                ),
-                const Text(
-                  'Product Information',
-                  style:
-                  TextStyle(
-                    fontSize:
-                    20,
-                    fontWeight:
-                    FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(
-                  height:
-                  8,
-                ),
-                const Text(
-                  'Products are matched using the latest item data from data.gov.my.',
-                  style:
-                  TextStyle(
-                    color:
-                    Colors.grey,
-                  ),
-                ),
-                const SizedBox(
-                  height:
-                  15,
-                ),
-                _buildProductAutocomplete(),
-                const SizedBox(
-                  height:
-                  12,
-                ),
-                SizedBox(
-                  width:
-                  double.infinity,
-                  child:
-                  OutlinedButton.icon(
-                    onPressed:
-                    _isCheckingProduct
-                        ? null
-                        : _checkProduct,
-                    icon:
-                    _isCheckingProduct
-                        ? const SizedBox(
-                      width:
-                      18,
-                      height:
-                      18,
-                      child:
-                      CircularProgressIndicator(
-                        strokeWidth:
-                        2,
-                      ),
-                    )
-                        : const Icon(
-                      Icons.search,
-                    ),
-                    label:
-                    Text(
-                      _isCheckingProduct
-                          ? 'CHECKING...'
-                          : 'CHECK PRICECATCHER',
-                    ),
-                  ),
-                ),
-                const SizedBox(
-                  height:
-                  14,
-                ),
-                _buildMatchStatus(),
-                if (_productMatched) ...[
-                  const SizedBox(
+              ),
+              const SizedBox(
+                height:
+                12,
+              ),
+              _buildGovernmentInfo(),
+              const SizedBox(
+                height:
+                16,
+              ),
+              _buildProductAutocomplete(),
+              const SizedBox(
+                height:
+                12,
+              ),
+              SizedBox(
+                width:
+                double.infinity,
+                child:
+                OutlinedButton.icon(
+                  onPressed:
+                  _isCheckingProduct
+                      ? null
+                      : _checkProduct,
+                  icon:
+                  _isCheckingProduct
+                      ? const SizedBox(
+                    width:
+                    18,
                     height:
-                    14,
+                    18,
+                    child:
+                    CircularProgressIndicator(
+                      strokeWidth:
+                      2,
+                    ),
+                  )
+                      : const Icon(
+                    Icons.search,
                   ),
-                  _buildPriceCatcherPrice(),
+                  label:
+                  Text(
+                    _isCheckingProduct
+                        ? 'CHECKING...'
+                        : 'CHECK PRODUCT',
+                  ),
+                ),
+              ),
+              const SizedBox(
+                height:
+                14,
+              ),
+              _buildMatchStatus(),
+              const SizedBox(
+                height:
+                18,
+              ),
+              _buildField(
+                controller:
+                _unitController,
+                label:
+                'Unit',
+                icon:
+                Icons
+                    .straighten_outlined,
+                enabled:
+                _productMatched ||
+                    _canEditManualFields,
+                readOnly:
+                _productMatched,
+              ),
+              const SizedBox(
+                height:
+                16,
+              ),
+              _buildField(
+                controller:
+                _categoryController,
+                label:
+                'Category',
+                icon:
+                Icons
+                    .category_outlined,
+                enabled:
+                _productMatched ||
+                    _canEditManualFields,
+                readOnly:
+                _productMatched,
+              ),
+              const SizedBox(
+                height:
+                16,
+              ),
+              TextField(
+                controller:
+                _priceController,
+                keyboardType:
+                const TextInputType
+                    .numberWithOptions(
+                  decimal:
+                  true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter
+                      .allow(
+                    RegExp(
+                      r'^\d{0,5}(\.\d{0,2})?',
+                    ),
+                  ),
                 ],
-                const SizedBox(
-                  height:
-                  18,
+                decoration:
+                InputDecoration(
+                  labelText:
+                  'Selling Price',
+                  hintText:
+                  '0.00',
+                  prefixText:
+                  'RM ',
+                  prefixIcon:
+                  const Icon(
+                    Icons
+                        .payments_outlined,
+                  ),
+                  filled:
+                  true,
+                  fillColor:
+                  Colors.white,
+                  border:
+                  OutlineInputBorder(
+                    borderRadius:
+                    BorderRadius.circular(
+                      12,
+                    ),
+                  ),
                 ),
-                _buildTextField(
-                  controller:
-                  _unitController,
-                  label:
-                  'Unit',
-                  hint:
-                  'Example: 1 KG',
+              ),
+              const SizedBox(
+                height:
+                26,
+              ),
+              SizedBox(
+                width:
+                double.infinity,
+                height:
+                55,
+                child:
+                FilledButton.icon(
+                  onPressed:
+                  _isSaving
+                      ? null
+                      : _saveProduct,
                   icon:
-                  Icons
-                      .straighten_outlined,
-                  enabled:
-                  _productMatched ||
-                      _canEditManualFields,
-                  readOnly:
-                  _productMatched,
-                ),
-                const SizedBox(
-                  height:
-                  16,
-                ),
-                _buildTextField(
-                  controller:
-                  _categoryController,
+                  _isSaving
+                      ? const SizedBox(
+                    width:
+                    20,
+                    height:
+                    20,
+                    child:
+                    CircularProgressIndicator(
+                      strokeWidth:
+                      2,
+                      color:
+                      Colors.white,
+                    ),
+                  )
+                      : const Icon(
+                    Icons
+                        .add_circle_outline,
+                  ),
                   label:
-                  'Category',
-                  hint:
-                  'Example: Beverages',
-                  icon:
-                  Icons
-                      .category_outlined,
-                  enabled:
-                  _productMatched ||
-                      _canEditManualFields,
-                  readOnly:
-                  _productMatched,
-                ),
-                const SizedBox(
-                  height:
-                  18,
-                ),
-                TextField(
-                  controller:
-                  _priceController,
-                  keyboardType:
-                  const TextInputType
-                      .numberWithOptions(
-                    decimal:
-                    true,
-                  ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter
-                        .allow(
-                      RegExp(
-                        r'^\d{0,5}(\.\d{0,2})?',
-                      ),
-                    ),
-                  ],
-                  decoration:
-                  InputDecoration(
-                    labelText:
-                    'Your Selling Price',
-                    hintText:
-                    '0.00',
-                    prefixText:
-                    'RM ',
-                    prefixIcon:
-                    const Icon(
-                      Icons
-                          .payments_outlined,
-                    ),
-                    filled:
-                    true,
-                    fillColor:
-                    Colors.white,
-                    border:
-                    OutlineInputBorder(
-                      borderRadius:
-                      BorderRadius.circular(
-                        12,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(
-                  height:
-                  30,
-                ),
-                SizedBox(
-                  width:
-                  double.infinity,
-                  height:
-                  55,
-                  child:
-                  FilledButton.icon(
-                    onPressed:
+                  Text(
                     _isSaving
-                        ? null
-                        : _saveProduct,
-                    icon:
-                    _isSaving
-                        ? const SizedBox(
-                      width:
-                      20,
-                      height:
-                      20,
-                      child:
-                      CircularProgressIndicator(
-                        strokeWidth:
-                        2,
-                        color:
-                        Colors.white,
-                      ),
-                    )
-                        : const Icon(
-                      Icons
-                          .add_circle_outline,
-                    ),
-                    label:
-                    Text(
-                      _isSaving
-                          ? 'ADDING PRODUCT...'
-                          : 'ADD PRODUCT',
-                    ),
+                        ? 'ADDING PRODUCT...'
+                        : 'ADD PRODUCT',
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
