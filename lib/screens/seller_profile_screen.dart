@@ -6,8 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/profile_service.dart';
 import 'change_password_screen.dart';
-import 'seller_edit_profile_screen.dart';
-import '../services/shopping_cart_service.dart';
+import 'edit_profile_screen.dart';
+import 'login_screen.dart';
 
 class SellerProfileScreen extends StatefulWidget {
   const SellerProfileScreen({
@@ -207,93 +207,34 @@ class _SellerProfileScreenState
   }
 
   Future<void> _logout() async {
-    if (_isLoggingOut) {
-      return;
-    }
-
-    final confirmed =
-    await showDialog<bool>(
-      context: context,
-      builder: (
-          dialogContext,
-          ) {
-        return AlertDialog(
-          title: const Text(
-            'Logout',
-          ),
-          content: const Text(
-            'Are you sure you want to logout?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                  false,
-                );
-              },
-              child: const Text(
-                'CANCEL',
-              ),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                  true,
-                );
-              },
-              style:
-              FilledButton.styleFrom(
-                backgroundColor:
-                Colors.red,
-              ),
-              child: const Text(
-                'LOGOUT',
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true) {
-      return;
-    }
-
-    setState(() {
-      _isLoggingOut = true;
-    });
-
     try {
-      await ShoppingCartService.instance.flush();
-      await Supabase.instance.client.auth
-          .signOut();
+      await Supabase.instance.client.auth.signOut();
 
       if (!mounted) {
         return;
       }
 
-      // AuthGate resets navigation when the session ends.
-    } catch (error) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+          const LoginScreen(),
+        ),
+            (route) => false,
+      );
+    } catch (_) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
           content: Text(
-            'Logout failed: $error',
+            'Unable to log out. Please try again.',
           ),
-          backgroundColor:
-          Colors.red,
+          backgroundColor: Colors.red,
         ),
       );
-
-      setState(() {
-        _isLoggingOut = false;
-      });
     }
   }
 
@@ -661,7 +602,7 @@ class _SellerProfileScreenState
                     MaterialPageRoute(
                       builder:
                           (_) =>
-                          SellerEditProfileScreen(
+                          EditProfileScreen(
                             profile:
                             _profile!,
                           ),
